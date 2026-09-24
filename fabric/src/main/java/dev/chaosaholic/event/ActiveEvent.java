@@ -21,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -97,6 +98,19 @@ public final class ActiveEvent {
 
 	public boolean isAffected(Entity entity) {
 		return entity instanceof ServerPlayer p && players.get(p.getUUID()) == p;
+	}
+
+	/**
+	 * Whether this instance's trackers may change {@code entity}: any non-player entity; a player only while affected
+	 * by this instance, or while eligible ({@link EventManager#isEligible}: Survival/Adventure, alive, online) and in
+	 * this instance's dimension (e.g. glow_party lights up other nearby players). Creative / Spectator, dead,
+	 * logged-out and other-dimension players are always refused, so {@code effects().give} and
+	 * {@code modifiers().add} simply return false for them.
+	 */
+	public boolean mayChange(Entity entity) {
+		if (!(entity instanceof Player)) return true;
+		if (!(entity instanceof ServerPlayer p)) return false;
+		return isAffected(p) || (EventManager.isEligible(p) && p.level() == level);
 	}
 
 	/** Affected player or an entity changed by one of this instance's trackers. */

@@ -196,7 +196,7 @@ public final class ChaosCommand {
 				started++;
 				c.getSource().sendSuccess(() -> Texts.tr("chaosaholic.command.trigger", Texts.name(event), target.getDisplayName()), true);
 			} else {
-				c.getSource().sendFailure(Texts.tr("chaosaholic.command.error.noTarget", Texts.name(event)));
+				c.getSource().sendFailure(refusal(manager.refusal(target, event), event, target));
 			}
 		}
 		return started;
@@ -212,10 +212,23 @@ public final class ChaosCommand {
 				ChaosEvent event = result.get().event();
 				source.sendSuccess(() -> Texts.tr("chaosaholic.command.trigger.random", Texts.name(event), target.getDisplayName()), true);
 			} else {
-				source.sendFailure(Texts.tr("chaosaholic.command.error.noEvents"));
+				source.sendFailure(refusal(manager.refusal(target, null), null, target));
 			}
 		}
 		return started;
+	}
+
+	/** The error line for a trigger ({@code event}) or roll ({@code event} null) that started nothing. */
+	private static Component refusal(EventManager.Refusal refusal, @Nullable ChaosEvent event, ServerPlayer target) {
+		Component player = target.getDisplayName();
+		return switch (refusal) {
+			case INELIGIBLE -> Texts.tr("chaosaholic.command.error.ineligible", player);
+			case NO_ROOM -> Texts.tr("chaosaholic.command.error.noRoom", player, String.valueOf(ChaosLimits.MAX_ACTIVE_PER_PLAYER));
+			case ALL_OFF -> Texts.tr("chaosaholic.command.error.noEvents");
+			case CANNOT_START -> event == null
+					? Texts.tr("chaosaholic.command.error.nothingCanStart", player)
+					: Texts.tr("chaosaholic.command.error.noTarget", Texts.name(event), player);
+		};
 	}
 
 	private static int stop(CommandSourceStack source, Collection<ServerPlayer> targets) throws CommandSyntaxException {

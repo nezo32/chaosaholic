@@ -17,6 +17,13 @@ import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.chicken.Chicken;
+import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
@@ -31,6 +38,11 @@ import org.jspecify.annotations.Nullable;
  * <p>Cleanup: at the end of the instance every owned entity is discarded (replacements are turned back into the
  * original). Plain spawned entities are never saved to disk, so a chunk unload or a crash simply drops them;
  * replacements are saved with the original's data and restored when loaded without a running owner.
+ *
+ * <p>No unowned side spawns: {@link #spawn} adds the entity together with its passengers (a spider jockey's
+ * skeleton) and owns all of them; owned zombies never call reinforcements; {@link #spawnMob} runs
+ * {@code finalizeSpawn} without chicken jockeys; a mob converting (zombie drowning, slime splitting) passes
+ * ownership on to what it became.
  */
 public final class OwnedEntities {
 	private final ActiveEvent owner;
@@ -46,25 +58,68 @@ public final class OwnedEntities {
 	}
 
 	/**
-	 * Tags {@code entity} as owned and adds it to the instance's level. Position it first. Returns null (and adds
-	 * nothing) when a cap is reached or the level refuses the entity.
+	 * Tags {@code entity} (and its passengers) as owned and adds it to the instance's level. Position it first. Returns
+	 * null (and adds nothing) when a cap is reached or the level refuses the entity. If {@code finalizeSpawn} already
+	 * sat the entity on a vehicle that is in the level, a vehicle created this tick (a jockey chicken) is owned too,
+	 * an older one (somebody's chicken) is left alone and the entity dismounts. Prefer {@link #spawnMob} for mobs.
 	 */
 	public <T extends Entity> @Nullable T spawn(T entity) {
 		if (entity instanceof Player || !canSpawn()) return null;
-		mark(entity, Optional.empty());
-		if (!owner.level().addFreshEntity(entity)) return null;
-		entities.put(entity.getUUID(), entity);
+		ServerLevel level = owner.level();
+		Entity vehicle = entity.getVehicle() == null ? null : entity.getRootVehicle();
+		if (vehicle != null && vehicle != entity && isInLevel(level, vehicle)) {
+			if (vehicle.tickCount == 0 && !(vehicle instanceof Player)) {
+				own(vehicle); // created by finalizeSpawn in this tick: a side spawn of ours
+			} else {
+				entity.stopRiding();
+				if (vehicle instanceof Chicken chicken && !chicken.isVehicle()) chicken.setChickenJockey(false);
+			}
+		}
+		List<Entity> all = entity.getSelfAndPassengers().toList();
+		for (Entity e : all) if (e instanceof Player) return null;
+		for (Entity e : all) {
+			mark(e, Optional.empty());
+			calm(e);
+		}
+		if (!level.tryAddFreshEntityWithPassengers(entity) || entity.isRemoved()) {
+			for (Entity e : all) unmark(e);
+			return null;
+		}
+		for (Entity e : all) if (!e.isRemoved()) entities.put(e.getUUID(), e);
 		return entity;
 	}
 
 	/**
+	 * Spawns a mob the vanilla way without side spawns: {@code finalizeSpawn} (equipment, difficulty bonuses; zombies
+	 * without chicken jockeys) at the mob's current position, then {@link #spawn}. Position the mob first
+	 * ({@code snapTo}). Returns null like {@link #spawn}.
+	 */
+	public <T extends Mob> @Nullable T spawnMob(T mob, EntitySpawnReason reason) {
+		if (!canSpawn()) return null;
+		prepare(owner.level(), mob, reason);
+		return spawn(mob);
+	}
+
+	/**
+	 * {@code mob.finalizeSpawn} with group data that forbids side spawns: a zombie (also husk, drowned, zombified
+	 * piglin, zombie villager) never brings a chicken jockey. For events that finalize a mob themselves before
+	 * {@link #spawn}.
+	 */
+	public static void prepare(ServerLevel level, Mob mob, EntitySpawnReason reason) {
+		SpawnGroupData data = mob instanceof Zombie ? new Zombie.ZombieGroupData(Zombie.getSpawnAsBabyOdds(level.getRandom()), false) : null;
+		mob.finalizeSpawn(level, level.getCurrentDifficultyAt(mob.blockPosition()), reason, data);
+	}
+
+	/**
 	 * Takes ownership of an entity that is already in the instance's level (e.g. what {@code FallingBlockEntity.fall}
-	 * returns, which adds itself). Returns false (and leaves it alone) when a cap is reached.
+	 * returns, which adds itself), with its passengers. Returns false (and leaves it alone) when a cap is reached.
 	 */
 	public boolean adopt(Entity entity) {
 		if (entity instanceof Player || entity.isRemoved() || entity.level() != owner.level() || !canSpawn()) return false;
-		mark(entity, Optional.empty());
-		entities.put(entity.getUUID(), entity);
+		for (Entity e : entity.getSelfAndPassengers().toList()) {
+			if (e instanceof Player || e.isRemoved()) continue;
+			own(e);
+		}
 		return true;
 	}
 
@@ -82,8 +137,9 @@ public final class OwnedEntities {
 		CompoundTag saved = out.buildResult();
 		replacement.snapTo(original.getX(), original.getY(), original.getZ(), original.getYRot(), original.getXRot());
 		mark(replacement, Optional.of(saved));
+		calm(replacement);
 		if (!owner.level().addFreshEntity(replacement)) {
-			replacement.removeAttached(Marks.OWNER);
+			unmark(replacement);
 			return null;
 		}
 		original.discard();
@@ -131,9 +187,33 @@ public final class OwnedEntities {
 		entities.put(entity.getUUID(), entity);
 	}
 
+	private void own(Entity entity) {
+		mark(entity, Optional.empty());
+		calm(entity);
+		entities.put(entity.getUUID(), entity);
+	}
+
 	private void mark(Entity entity, Optional<CompoundTag> restore) {
 		entity.addTag(Marks.OWNED_TAG);
 		entity.setAttached(Marks.OWNER, new Marks.OwnerMark(owner.uuid(), restore));
+	}
+
+	private static void unmark(Entity entity) {
+		entity.removeAttached(Marks.OWNER);
+		entity.removeTag(Marks.OWNED_TAG);
+	}
+
+	/** No reinforcements: a zombie hit by a player on Hard would otherwise call unowned zombies. */
+	private static void calm(Entity entity) {
+		if (!(entity instanceof LivingEntity living)) return;
+		AttributeInstance reinforcements = living.getAttribute(Attributes.SPAWN_REINFORCEMENTS_CHANCE);
+		if (reinforcements == null) return;
+		reinforcements.removeModifiers();
+		reinforcements.setBaseValue(0.0);
+	}
+
+	private static boolean isInLevel(ServerLevel level, Entity entity) {
+		return !entity.isRemoved() && entity.level() == level && level.getEntity(entity.getUUID()) == entity;
 	}
 
 	/** True for entities that must never be written to disk: owned, without an original to restore (EntityMixin). */
@@ -142,30 +222,38 @@ public final class OwnedEntities {
 		return mark != null && mark.restore().isEmpty();
 	}
 
-	/** Discards {@code entity}, or turns it back into the original it replaced. */
+	/**
+	 * Discards {@code entity}, or turns it back into the original it replaced. If the original cannot be restored
+	 * (corrupt data, the level refuses it), the replacement stays as a normal entity (mark and tag removed) rather
+	 * than losing both; a warning is logged. A dead (dying) replacement is just discarded: the original died with it.
+	 */
 	public static void revert(Entity entity) {
-		Marks.OwnerMark mark = entity.getAttached(Marks.OWNER);
 		if (entity.isRemoved()) return;
-		if (mark != null && mark.restore().isPresent() && entity.level() instanceof ServerLevel level) {
-			restore(level, entity, mark.restore().get());
+		Marks.OwnerMark mark = entity.getAttached(Marks.OWNER);
+		// a replacement that died (killed during the event, still in its death animation) took the original with it
+		boolean dead = entity instanceof LivingEntity living && living.isDeadOrDying();
+		if (mark != null && mark.restore().isPresent() && !dead && entity.level() instanceof ServerLevel level) {
+			if (!restore(level, entity, mark.restore().get())) {
+				unmark(entity);
+				Chaosaholic.LOGGER.warn("Could not restore the entity replaced by {} after a chaos event; keeping the replacement", entity);
+				return;
+			}
 		}
 		entity.discard();
 	}
 
-	private static void restore(ServerLevel level, Entity at, CompoundTag saved) {
+	/** Adds the original back at the replacement's position. False (nothing added) if that failed. */
+	private static boolean restore(ServerLevel level, Entity at, CompoundTag saved) {
 		try {
 			Entity original = EntityType.loadEntityRecursive(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), saved),
 					level, EntitySpawnReason.LOAD, e -> {
 						e.snapTo(at.getX(), at.getY(), at.getZ(), at.getYRot(), at.getXRot());
 						return e;
 					});
-			if (original == null) return;
-			at.discard(); // free the position (and never keep two copies)
-			if (!level.tryAddFreshEntityWithPassengers(original)) {
-				Chaosaholic.LOGGER.warn("Could not restore {} replaced by a chaos event", original);
-			}
+			return original != null && level.tryAddFreshEntityWithPassengers(original) && !original.isRemoved();
 		} catch (RuntimeException e) {
 			Chaosaholic.LOGGER.warn("Could not restore an entity replaced by a chaos event", e);
+			return false;
 		}
 	}
 
@@ -184,6 +272,36 @@ public final class OwnedEntities {
 			live.entities().readopt(entity);
 		} else {
 			EventManager.defer(() -> revert(entity));
+		}
+	}
+
+	/**
+	 * ServerLivingEntityEvents.AFTER_DEATH of any non-player: a replacement that dies drops its snapshot (the original
+	 * dies with it: it is never restored, neither at the end nor after a reload); it stays owned, so it is discarded
+	 * at the end and never saved.
+	 */
+	public static void onDeath(LivingEntity entity) {
+		Marks.OwnerMark mark = entity.getAttached(Marks.OWNER);
+		if (mark == null || mark.restore().isEmpty()) return;
+		entity.setAttached(Marks.OWNER, new Marks.OwnerMark(mark.owner(), Optional.empty()));
+	}
+
+	/**
+	 * ServerLivingEntityEvents.MOB_CONVERSION: what an owned mob turns into (zombie → drowned, slime → smaller
+	 * slimes, a replacement struck by lightning) inherits its mark, so it is removed (or turned back into the
+	 * original) at the end too and is never saved as a stray mob.
+	 */
+	public static void onConversion(Mob previous, Mob converted) {
+		Marks.OwnerMark mark = previous.getAttached(Marks.OWNER);
+		if (mark == null) return;
+		converted.addTag(Marks.OWNED_TAG);
+		converted.setAttached(Marks.OWNER, mark);
+		calm(converted);
+		ActiveEvent live = EventManager.findLive(mark.owner());
+		if (live != null && !live.isStopped()) {
+			live.entities().readopt(converted);
+		} else {
+			EventManager.defer(() -> revert(converted));
 		}
 	}
 }

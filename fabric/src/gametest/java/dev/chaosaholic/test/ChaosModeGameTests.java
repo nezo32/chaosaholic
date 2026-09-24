@@ -10,8 +10,10 @@ import static dev.chaosaholic.test.TestSupport.survivalPlayer;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.chaosaholic.Texts;
+import dev.chaosaholic.core.ChaosLimits;
 import dev.chaosaholic.core.EventIds;
 import dev.chaosaholic.event.ChaosEvent;
+import dev.chaosaholic.event.EventManager;
 import dev.chaosaholic.event.EventRegistry;
 import dev.chaosaholic.mixin.MinecraftServerAccessor;
 import dev.chaosaholic.mode.ChaosSettings;
@@ -31,6 +33,7 @@ import net.minecraft.world.level.GameType;
 /**
  * /chaosaholic commands, per-world settings (SavedData), the Create World handoff and the lang keys of every
  * registered event. Settings are server-global: every test here is synchronous and ends with {@code defaults}.
+ * Tests that switch the mode OFF (which stops every running instance) run in {@link TestSupport#GLOBAL_STATE}.
  */
 public class ChaosModeGameTests {
 	private static int run(GameTestHelper h, CommandSourceStack source, String command) throws CommandSyntaxException {
@@ -42,7 +45,7 @@ public class ChaosModeGameTests {
 		return h.getLevel().getServer().createCommandSourceStack();
 	}
 
-	@GameTest
+	@GameTest(environment = TestSupport.GLOBAL_STATE)
 	public void commandOnOffStatus(GameTestHelper h) throws CommandSyntaxException {
 		defaults(h);
 		try {
@@ -142,7 +145,8 @@ public class ChaosModeGameTests {
 			h.assertValueEqual(run(h, op(h), "chaosaholic trigger speed_demon " + creative.getGameProfile().name()), 0, "creative target refused");
 			h.assertTrue(manager(h).activeFor(creative).isEmpty(), "creative untouched");
 			h.assertValueEqual(run(h, op(h), "chaosaholic trigger no_such_event " + p.getGameProfile().name()), 0, "unknown id");
-			h.assertValueEqual(run(h, op(h), "chaosaholic trigger midas_hour " + p.getGameProfile().name()), 0, "unimplemented event refused");
+			h.assertValueEqual(run(h, op(h), "chaosaholic trigger test_refuse " + p.getGameProfile().name()), 0, "canStart false refused");
+			h.assertValueEqual(run(h, op(h), "chaosaholic roll " + creative.getGameProfile().name()), 0, "creative roll refused");
 			h.assertValueEqual(run(h, op(h), "chaosaholic stop " + p.getGameProfile().name()), 1, "stop result");
 			h.assertTrue(manager(h).activeFor(p).isEmpty(), "stopped");
 			defaults(h); // roll uses the switches: back to the safe set
@@ -155,7 +159,38 @@ public class ChaosModeGameTests {
 		h.succeed();
 	}
 
+	/** Why trigger / roll started nothing: the reason behind each command error message. Synchronous. */
 	@GameTest
+	public void refusalReasons(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		ServerPlayer creative = survivalPlayer(h);
+		creative.setGameMode(GameType.CREATIVE);
+		EventManager m = manager(h);
+		try {
+			h.assertValueEqual(m.refusal(creative, null), EventManager.Refusal.INELIGIBLE, "creative roll");
+			h.assertValueEqual(m.refusal(creative, event("speed_demon")), EventManager.Refusal.INELIGIBLE, "creative trigger");
+			h.assertTrue(m.trigger(event("test_refuse"), p).isEmpty(), "refused");
+			h.assertValueEqual(m.refusal(p, event("test_refuse")), EventManager.Refusal.CANNOT_START, "canStart false");
+			for (ChaosEvent e : EventRegistry.all()) settings(h).setEventEnabled(e, false);
+			h.assertTrue(m.roll(p).isEmpty(), "nothing enabled");
+			h.assertValueEqual(m.refusal(p, null), EventManager.Refusal.ALL_OFF, "all off");
+			defaults(h);
+			for (int i = 1; i <= TestEvents.SLOTS; i++) TestSupport.start(h, TestEvents.slot(i), p);
+			h.assertValueEqual(m.activeCount(p), ChaosLimits.MAX_ACTIVE_PER_PLAYER, "full");
+			h.assertTrue(m.trigger(event("speed_demon"), p).isEmpty(), "no room for a ninth");
+			h.assertValueEqual(m.refusal(p, event("speed_demon")), EventManager.Refusal.NO_ROOM, "no room");
+			h.assertValueEqual(m.refusal(p, null), EventManager.Refusal.NO_ROOM, "no room (roll)");
+			h.assertTrue(m.trigger(event(TestEvents.slot(1)), p).isPresent(), "a running event still extends");
+			h.assertTrue(m.trigger(event("test_instant"), p).isPresent(), "instant events need no slot");
+		} finally {
+			defaults(h);
+			cleanup(h, p, creative);
+		}
+		h.succeed();
+	}
+
+	@GameTest(environment = TestSupport.GLOBAL_STATE)
 	public void modeOffStopsEventsAndClearsQueues(GameTestHelper h) throws CommandSyntaxException {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);
@@ -195,7 +230,7 @@ public class ChaosModeGameTests {
 	}
 
 	/** Create World handoff: a pending value on the storage access wins and is consumed once. */
-	@GameTest
+	@GameTest(environment = TestSupport.GLOBAL_STATE)
 	public void pendingWorldModeIsConsumedOnce(GameTestHelper h) {
 		MinecraftServer server = h.getLevel().getServer();
 		PendingWorldMode access = (PendingWorldMode) ((MinecraftServerAccessor) server).chaosaholic$getStorageSource();

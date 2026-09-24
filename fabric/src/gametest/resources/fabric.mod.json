@@ -5,6 +5,9 @@
 	"name": "Chaosaholic GameTests",
 	"environment": "*",
 	"entrypoints": {
+		"main": [
+			"dev.chaosaholic.test.TestEvents"
+		],
 		"fabric-gametest": [
 			"dev.chaosaholic.test.ChaosModeGameTests",
 			"dev.chaosaholic.test.ChaosLevelGameTests",

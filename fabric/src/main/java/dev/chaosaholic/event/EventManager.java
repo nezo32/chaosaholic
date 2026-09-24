@@ -99,6 +99,7 @@ public final class EventManager {
 			OwnedEntities.onEntityLoad(entity, level);
 			TrackedNames.onEntityLoad(entity, level);
 		});
+		ServerLivingEntityEvents.MOB_CONVERSION.register((previous, converted, params) -> OwnedEntities.onConversion(previous, converted));
 		ServerEntityEvents.ENTITY_UNLOAD.register((entity, level) -> with(level.getServer(), m -> m.onUnload(entity)));
 	}
 
@@ -225,7 +226,12 @@ public final class EventManager {
 			}
 			if (!guarded(ev, ev::advance) || ev.isStopped()) continue;
 			if (!guarded(ev, () -> ev.event().onTick(ev)) || ev.isStopped()) continue;
-			if (ev.age() % ChaosLimits.EFFECT_REFRESH_TICKS == 0) guarded(ev, () -> ev.effects().refresh());
+			if (ev.age() % ChaosLimits.EFFECT_REFRESH_TICKS == 0) {
+				guarded(ev, () -> {
+					ev.effects().refresh();
+					ev.modifiers().prune();
+				});
+			}
 			if (ev.age() % ChaosLimits.BOSS_BAR_UPDATE_TICKS == 0) updateBar(ev);
 			if (ev.remainingTicks() <= 0) stop(ev, StopReason.EXPIRED);
 		}
@@ -278,6 +284,36 @@ public final class EventManager {
 		EventContext ctx = context(trigger);
 		if (!canStart(event, ctx)) return Optional.empty();
 		return start(event, ctx);
+	}
+
+	/** Why {@link #roll} or {@link #trigger} started nothing for a player (command feedback). */
+	public enum Refusal {
+		/** Creative / Spectator, dead, offline or a fake player. */
+		INELIGIBLE,
+		/** Already {@link ChaosLimits#MAX_ACTIVE_PER_PLAYER} timed events. */
+		NO_ROOM,
+		/** Every event is switched off or has weight 0 (roll only). */
+		ALL_OFF,
+		/** No event (roll) / not this event (trigger) can start here now: canStart refused. */
+		CANNOT_START
+	}
+
+	/**
+	 * The reason {@link #roll} (event null) or {@link #trigger} (that event) would start nothing for {@code player}
+	 * right now. Call it after the attempt returned empty; never returns null.
+	 */
+	public Refusal refusal(ServerPlayer player, @Nullable ChaosEvent event) {
+		if (!isEligible(player)) return Refusal.INELIGIBLE;
+		boolean extendable = event != null && !event.isInstant() && find(event, player) != null;
+		boolean instant = event != null && event.isInstant();
+		if (!extendable && !instant && !Stacking.hasRoom(activeCount(player), ChaosLimits.MAX_ACTIVE_PER_PLAYER)) return Refusal.NO_ROOM;
+		if (event == null) {
+			ChaosSettings settings = ChaosSettings.get(server);
+			boolean any = false;
+			for (ChaosEvent e : EventRegistry.all()) if (settings.effectiveWeight(e) > 0) any = true;
+			if (!any) return Refusal.ALL_OFF;
+		}
+		return Refusal.CANNOT_START;
 	}
 
 	private boolean canStart(ChaosEvent event, EventContext ctx) {
@@ -363,9 +399,19 @@ public final class EventManager {
 		sync(player);
 	}
 
+	/**
+	 * Logout, death, dimension change: removes {@code player} from every instance affecting it, and reverts the
+	 * effects / modifiers of every other instance that changed it without affecting it (e.g. glow_party lighting up a
+	 * nearby player), so nothing is saved with the player or carried into another dimension.
+	 */
 	private void removeEverywhere(ServerPlayer player, RemoveReason reason) {
 		for (ActiveEvent ev : List.copyOf(active)) {
-			if (ev.playerMap().get(player.getUUID()) == player) removePlayer(ev, player, reason);
+			if (ev.playerMap().get(player.getUUID()) == player) {
+				removePlayer(ev, player, reason);
+			} else if (ev.effects().tracks(player) || ev.modifiers().tracks(player)) {
+				safely(ev, "effects", () -> ev.effects().revert(player));
+				safely(ev, "modifiers", () -> ev.modifiers().revert(player));
+			}
 		}
 	}
 
@@ -424,6 +470,7 @@ public final class EventManager {
 			}
 			return;
 		}
+		OwnedEntities.onDeath(entity); // a dead replacement is never turned back
 		if (source.getEntity() instanceof ServerPlayer killer) {
 			for (ActiveEvent ev : List.copyOf(m.active)) m.guarded(ev, () -> ev.event().afterKill(ev, killer, entity, source));
 		}

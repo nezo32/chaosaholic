@@ -127,7 +127,7 @@ class LangFileTest {
 
 	@Test
 	void warningKeysExactlyForWarningEvents() {
-		assertEquals(new TreeSet<>(List.of("anvil_rain", "lightning_storm", "tnt_rain")), new TreeSet<>(warningEvents));
+		assertEquals(new TreeSet<>(List.of("anvil_rain", "bee_swarm", "lightning_storm", "mob_surprise", "tnt_rain")), new TreeSet<>(warningEvents));
 		for (String key : lang.keySet()) {
 			if (!key.endsWith(".warning")) continue;
 			String id = key.substring("chaosaholic.event.".length(), key.length() - ".warning".length());

@@ -26,20 +26,22 @@ public final class Warning {
 	}
 
 	/**
-	 * Warns every affected player now and each second until the hazard, then runs {@code hazard} (in the instance's
-	 * tick; nothing runs if the instance ended first). Call from {@code onStart} (players are added right after, so
-	 * the first ping is sent one tick later) or from {@code onTick}.
+	 * Warns every affected player on the next tick and each second after, then runs {@code hazard} exactly
+	 * {@link #delay} ticks after the first ping (in the instance's tick; nothing runs if the instance ended first).
+	 * Call from {@code onStart} (players are added right after, so the first ping goes out on the next tick) or from
+	 * {@code onTick}.
 	 */
 	public static void thenRun(ActiveEvent ev, Runnable hazard) {
 		int delay = delay(ev.context());
 		int steps = delay / ChaosLimits.TICKS_PER_SECOND;
+		int first = 1;
 		for (int i = 0; i < steps; i++) {
 			int step = i;
-			ev.schedule(i * ChaosLimits.TICKS_PER_SECOND + (i == 0 ? 1 : 0), () -> {
+			ev.schedule(first + i * ChaosLimits.TICKS_PER_SECOND, () -> {
 				for (ServerPlayer p : ev.players()) warn(p, ev.event(), step);
 			});
 		}
-		ev.schedule(delay, hazard);
+		ev.schedule(first + delay, hazard);
 	}
 
 	/** One warning ping for {@code player}; step 0, 1, 2 ... raises the pitch. */

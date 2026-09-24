@@ -101,7 +101,6 @@ player reads is a translation key: server-side text goes through `Texts.tr` (Eng
 | `chaosaholic.time.seconds` | %s s |
 | `chaosaholic.time.minutes` | %1$s:%2$s |
 | `chaosaholic.announce.title` | %s |
-| `chaosaholic.announce.category` | %s event |
 | `chaosaholic.announce.actionbar` | ✦ %1$s · %2$s |
 | `chaosaholic.warning.format` | ⚠ %s |
 | `chaosaholic.createWorld.toggle` | Chaosaholic Mode |
@@ -131,13 +130,14 @@ player reads is a translation key: server-side text goes through `Texts.tr` (Eng
 | `chaosaholic.command.trigger.random` | Rolled %1$s for %2$s |
 | `chaosaholic.command.stop` | Stopped active events: %s |
 | `chaosaholic.command.error.unknownEvent` | Unknown event: %s. See /chaosaholic events |
-| `chaosaholic.command.error.noTarget` | %s has no valid target right now |
-| `chaosaholic.command.error.disabled` | %s is switched off in this world |
-| `chaosaholic.command.error.modeOff` | Chaosaholic Mode is OFF in this world. Turn it on with /chaosaholic on |
+| `chaosaholic.command.error.noTarget` | %1$s can't start for %2$s here right now |
+| `chaosaholic.command.error.ineligible` | %s can't get chaos events right now: only living players in Survival or Adventure mode can |
+| `chaosaholic.command.error.noRoom` | %1$s already has %2$s active events, the maximum. More start when one ends |
+| `chaosaholic.command.error.nothingCanStart` | None of the enabled events can start for %s here right now |
 | `chaosaholic.command.error.noEvents` | Every event is switched off, so nothing can roll |
 | `chaosaholic.settings.title` | Chaosaholic Settings |
 | `chaosaholic.settings.notifySound` | Event sound |
-| `chaosaholic.settings.notifySound.tooltip` | Play a sound when a chaos event starts. Danger warnings (TNT, anvils, lightning) always play. |
+| `chaosaholic.settings.notifySound.tooltip` | Play a sound when a chaos event starts. Danger warnings (TNT, anvils, lightning, mobs, bees) always play. |
 | `chaosaholic.settings.notifyMessage` | Event messages |
 | `chaosaholic.settings.notifyMessage.tooltip` | Show the title and the actionbar line when a chaos event starts. Boss bars and danger warnings always show. |
 | `chaosaholic.settings.screenEffects` | Screen effects |
@@ -154,22 +154,23 @@ Notes:
 - `chaosaholic.command.value.on|off` are the ON/OFF words in command feedback; buttons use vanilla's own ON/OFF.
 - The announcement uses `.announce.title` (Bad: title + `.announce` subtitle) and `.announce.actionbar` (Good and
   Weird); danger warnings use `chaosaholic.warning.format`.
-- Reserved, not used by the code yet: `chaosaholic.announce.category`, `chaosaholic.command.error.disabled`,
-  `chaosaholic.command.error.modeOff`.
+- `/chaosaholic trigger` and `/chaosaholic roll` explain a refusal per player: `.ineligible` (Creative, Spectator,
+  dead), `.noRoom` (already 8 events), `.noTarget` (that event cannot start here), `.nothingCanStart` (roll: no
+  enabled event can start here), `.noEvents` (roll: every event is switched off).
 - There is no scope button on the Create World screen: scope is set with `/chaosaholic scope player|world`.
 
 **Announcement:** when an event starts, the player sees its name as a title in the category colour, with the
 `.announce` line as a gray subtitle (Bad events), or `✦ <name> · <announce>` on the actionbar (Good and Weird events).
-Build it with `Component.translatable(...)`, never by concatenating strings. The three dangerous events show their
+Build it with `Component.translatable(...)`, never by concatenating strings. The dangerous events show their
 `.warning` line on the actionbar (`chaosaholic.warning.format`, `⚠`, gold) for 3 seconds (4 on Hardcore) before the
-first hazard, even when messages and sounds are off. Mob Surprise and Bee Swarm have no `.warning` key: their
-warning shows `⚠ <event name>` in the same style.
+first hazard, even when messages and sounds are off. The dangerous events are TNT Rain, Anvil Rain, Lightning Storm,
+Mob Surprise and Bee Swarm.
 
 ## Event names
 
 Keys: `chaosaholic.event.<id>` (name, ≤ 20 characters because it sits in the boss bar), `.desc` (one line, shown in
 `/chaosaholic events` hovers and the README), `.announce` (start subtitle) and `.warning` (only `tnt_rain`,
-`anvil_rain`, `lightning_storm`).
+`anvil_rain`, `lightning_storm`, `mob_surprise`, `bee_swarm`).
 
 | id | Category | Name | Name (ru_ru) | `.desc` |
 |---|---|---|---|---|

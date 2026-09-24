@@ -14,7 +14,7 @@ import net.minecraft.world.entity.player.Player;
 /**
  * Temporary custom names (e.g. "Dinnerbone" to flip mobs). The original name and visibility are stored in a
  * persistent {@link Marks.NameMark} on the entity, so they come back at the end of the event, after a chunk reload
- * or after a crash.
+ * or after a crash - unless a player renamed the entity (name tag) in the meantime: then the player's name stays.
  */
 public final class TrackedNames {
 	private final ActiveEvent owner;
@@ -31,7 +31,8 @@ public final class TrackedNames {
 	 */
 	public boolean rename(Entity entity, Component name, boolean visible) {
 		if (entity instanceof Player || entity.hasAttached(Marks.NAME)) return false;
-		entity.setAttached(Marks.NAME, new Marks.NameMark(owner.uuid(), Optional.ofNullable(entity.getCustomName()), entity.isCustomNameVisible()));
+		entity.setAttached(Marks.NAME, new Marks.NameMark(owner.uuid(), Optional.ofNullable(entity.getCustomName()), entity.isCustomNameVisible(),
+				Optional.of(name)));
 		entity.setCustomName(name);
 		entity.setCustomNameVisible(visible);
 		entities.add(entity);
@@ -60,10 +61,14 @@ public final class TrackedNames {
 		if (!entities.contains(entity)) entities.add(entity);
 	}
 
-	/** Puts the stored original name back and removes the mark. */
+	/**
+	 * Removes the mark and puts the stored original name back, if the entity still carries the name the event set
+	 * (a name tag applied during the event is kept).
+	 */
 	public static void restore(Entity entity) {
 		Marks.NameMark mark = entity.removeAttached(Marks.NAME);
 		if (mark == null) return;
+		if (mark.applied().isPresent() && !mark.applied().get().equals(entity.getCustomName())) return;
 		entity.setCustomName(mark.name().orElse(null));
 		entity.setCustomNameVisible(mark.visible());
 	}

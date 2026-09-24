@@ -2,13 +2,16 @@ package dev.chaosaholic.test;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import dev.chaosaholic.core.ChaosLimits;
 import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.Category;
 import dev.chaosaholic.event.ChaosEvent;
+import dev.chaosaholic.event.EventContext;
 import dev.chaosaholic.event.EventRegistry;
 import dev.chaosaholic.event.RemoveReason;
 import dev.chaosaholic.event.StopReason;
 import dev.chaosaholic.event.helper.Area;
+import net.fabricmc.api.ModInitializer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffects;
@@ -23,17 +26,29 @@ import net.minecraft.world.level.block.Blocks;
 /**
  * Test-only events (ids {@code test_*}), registered by the gametest mod only; never part of the real mod. They
  * exercise framework features that the three real reference events do not: instant events, owned entities,
- * temporary blocks, temporary names, replacements and error handling. Random rolls never pick them
- * ({@link TestSupport#defaults} switches them off).
+ * temporary blocks, temporary names, replacements, refusals, the per-player cap and error handling.
+ *
+ * <p>Registered deterministically by the gametest mod's {@code main} entrypoint (before the server starts, so before
+ * any test or roll), all with default weight 0: random rolls never pick them, even before {@link TestSupport#defaults}
+ * switches them off. {@link #ensureRegistered} is kept as a no-op safety net.
  */
-public final class TestEvents {
+public final class TestEvents implements ModInitializer {
 	public static final AtomicInteger INSTANT_RUNS = new AtomicInteger();
 	public static final AtomicInteger BOOM_STOPS = new AtomicInteger();
 	public static final AtomicInteger REMOVED_BY_LOGOUT = new AtomicInteger();
 
 	private static boolean registered;
 
-	private TestEvents() {}
+	/** Number of {@code test_slot_<n>} events: enough to fill every per-player slot. */
+	public static final int SLOTS = ChaosLimits.MAX_ACTIVE_PER_PLAYER;
+
+	/** Entrypoint "main" of the gametest mod. */
+	public TestEvents() {}
+
+	@Override
+	public void onInitialize() {
+		ensureRegistered();
+	}
 
 	public static synchronized void ensureRegistered() {
 		if (registered) return;
@@ -42,6 +57,32 @@ public final class TestEvents {
 		EventRegistry.register(new Resources());
 		EventRegistry.register(new Boom());
 		EventRegistry.register(new Marker());
+		EventRegistry.register(new Refuse());
+		for (int i = 1; i <= SLOTS; i++) EventRegistry.register(new Slot(i));
+	}
+
+	/** Id of the {@code n}-th slot filler (1-based). */
+	public static String slot(int n) {
+		return "test_slot_" + n;
+	}
+
+	/** Timed, does nothing: fills one of a player's {@link ChaosLimits#MAX_ACTIVE_PER_PLAYER} slots. */
+	static final class Slot extends ChaosEvent {
+		Slot(int n) {
+			super(slot(n), Category.WEIRD, 60, 60, 0);
+		}
+	}
+
+	/** Timed, but canStart always refuses (like an event without a valid target). */
+	static final class Refuse extends ChaosEvent {
+		Refuse() {
+			super("test_refuse", Category.GOOD, 60, 60, 0);
+		}
+
+		@Override
+		public boolean canStart(EventContext ctx) {
+			return false;
+		}
 	}
 
 	/**
@@ -50,7 +91,7 @@ public final class TestEvents {
 	 */
 	static final class Marker extends ChaosEvent {
 		Marker() {
-			super("test_marker", Category.WEIRD, 60, 60);
+			super("test_marker", Category.WEIRD, 60, 60, 0);
 		}
 
 		@Override
@@ -62,7 +103,7 @@ public final class TestEvents {
 	/** Instant: counts runs; no boss bar, ends the tick it starts. */
 	static final class Instant extends ChaosEvent {
 		Instant() {
-			super("test_instant", Category.WEIRD, INSTANT, INSTANT);
+			super("test_instant", Category.WEIRD, INSTANT, INSTANT, 0);
 		}
 
 		@Override
@@ -78,7 +119,7 @@ public final class TestEvents {
 	 */
 	static final class Resources extends ChaosEvent {
 		Resources() {
-			super("test_resources", Category.WEIRD, 60, 60);
+			super("test_resources", Category.WEIRD, 60, 60, 0);
 		}
 
 		@Override
@@ -109,7 +150,7 @@ public final class TestEvents {
 	/** Throws from onTick on its third tick: the framework must stop it (ERROR) and still clean up. */
 	static final class Boom extends ChaosEvent {
 		Boom() {
-			super("test_boom", Category.BAD, 60, 60);
+			super("test_boom", Category.BAD, 60, 60, 0);
 		}
 
 		@Override

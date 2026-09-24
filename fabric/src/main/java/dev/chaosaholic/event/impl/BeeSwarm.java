@@ -14,7 +14,7 @@ import dev.chaosaholic.event.EventContext;
 import dev.chaosaholic.event.RemoveReason;
 import dev.chaosaholic.event.StopReason;
 import dev.chaosaholic.event.helper.Spots;
-import dev.chaosaholic.event.impl.mob.MobWarning;
+import dev.chaosaholic.event.helper.Warning;
 import dev.chaosaholic.event.impl.mob.NoLoot;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleTypes;
@@ -33,7 +33,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Bad: a few angry bees chase each affected player for 30-45 s. After the warning (3 s, 4 s on Hardcore,
- * {@link MobWarning}) {@link #swarmSize swarm size} bees (Easy 2, Normal 3, Hard/Hardcore {@link #MAX_BEES}) appear
+ * {@link Warning}) {@link #swarmSize swarm size} bees (Easy 2, Normal 3, Hard/Hardcore {@link #MAX_BEES}) appear
  * {@link #MIN_DISTANCE}-{@link #MAX_DISTANCE} blocks away, angry at that player (re-angered every second so vanilla's
  * anger timer never runs out during the run). Refused on Peaceful (bees would do no damage there).
  *
@@ -80,7 +80,7 @@ public final class BeeSwarm extends ChaosEvent {
 
 	@Override
 	public void onStart(ActiveEvent ev) {
-		MobWarning.thenRun(ev, () -> release(ev));
+		Warning.thenRun(ev, () -> release(ev));
 	}
 
 	@Override
@@ -90,7 +90,7 @@ public final class BeeSwarm extends ChaosEvent {
 
 	@Override
 	public void onExtended(ActiveEvent ev, int addedTicks) {
-		MobWarning.thenRun(ev, () -> release(ev));
+		Warning.thenRun(ev, () -> release(ev));
 	}
 
 	private void release(ActiveEvent ev) {
@@ -180,5 +180,10 @@ public final class BeeSwarm extends ChaosEvent {
 	@Override
 	public Holder<SoundEvent> startSound() {
 		return BuiltInRegistries.SOUND_EVENT.wrapAsHolder(SoundEvents.BEEHIVE_EXIT);
+	}
+
+	@Override
+	public boolean hasWarning() {
+		return true; // Warning.thenRun(...) before every wave
 	}
 }

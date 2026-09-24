@@ -21,10 +21,12 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -36,8 +38,21 @@ import net.minecraft.world.phys.Vec3;
  * structure). A test that needs other settings changes them, does synchronous work only, and calls
  * {@link #defaults} again before returning. {@code EventManager#trigger} ignores switches and weights, so event
  * tests do not depend on these settings at all.
+ *
+ * <p>Server-wide actions (anything that stops or reverts other tests' instances: {@code /chaosaholic off},
+ * {@code EventManager#stopAll}, {@code TempBlockStore#restoreAll}, {@code ModeBootstrap}) are only allowed in tests
+ * annotated {@code @GameTest(environment = TestSupport.GLOBAL_STATE)}. Vanilla runs every test environment as its own
+ * batch, one batch after the other, so those tests never overlap with the multi-tick tests of the default batch.
+ * Tests in that environment must be synchronous (finish in their first tick) and restore {@link #defaults}, because
+ * they do run in parallel with each other.
  */
 public final class TestSupport {
+	/**
+	 * Test environment (gametest {@code data/chaosaholic-gametest/test_environment/global_state.json}, an empty
+	 * {@code all_of}) for tests that touch server-wide state. See the class comment.
+	 */
+	public static final String GLOBAL_STATE = "chaosaholic-gametest:global_state";
+
 	/** The only events random rolls may pick in gametests: harmless, player-only, no world changes. */
 	public static final Set<String> SAFE_EVENTS = Set.of("speed_demon", "feather_fall");
 
@@ -101,6 +116,24 @@ public final class TestSupport {
 	public static ServerPlayer player(GameTestHelper h, GameType mode) {
 		ServerPlayer p = survivalPlayer(h);
 		p.setGameMode(mode);
+		return p;
+	}
+
+	/**
+	 * Logs {@code profile} in again the way a real login does: a new ServerPlayer loaded from the player data the
+	 * logout saved, then placed in the level (survival). The manager is NOT told (the next tick observes it).
+	 */
+	public static ServerPlayer relogin(GameTestHelper h, GameProfile profile) {
+		ServerLevel level = h.getLevel();
+		MinecraftServer server = level.getServer();
+		CommonListenerCookie cookie = CommonListenerCookie.createInitial(profile, false);
+		ServerPlayer p = new ServerPlayer(server, level, profile, cookie.clientInformation());
+		server.getPlayerList().loadPlayerData(p.nameAndId())
+				.ifPresent(tag -> p.load(TagValueInput.create(ProblemReporter.DISCARDING, server.registryAccess(), tag)));
+		Connection connection = new Connection(PacketFlow.SERVERBOUND);
+		new EmbeddedChannel(connection);
+		server.getPlayerList().placeNewPlayer(connection, p, cookie);
+		p.setGameMode(GameType.SURVIVAL);
 		return p;
 	}
 

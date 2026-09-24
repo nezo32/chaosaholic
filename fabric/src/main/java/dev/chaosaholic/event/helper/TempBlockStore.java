@@ -76,8 +76,11 @@ public final class TempBlockStore extends SavedData {
 		changed();
 	}
 
-	/** Restores (and forgets) every block of {@code owner}. */
-	void restore(MinecraftServer server, UUID owner) {
+	/**
+	 * Restores (and forgets) every block of {@code owner}: the end of an instance ({@link TempBlocks}), or a leftover
+	 * of one instance only (tests; unlike {@link #restoreAll} it never touches other running instances' blocks).
+	 */
+	public void restore(MinecraftServer server, UUID owner) {
 		List<Entry> mine = new ArrayList<>();
 		entries.removeIf(e -> {
 			if (!e.owner().equals(owner)) return false;
@@ -89,7 +92,10 @@ public final class TempBlockStore extends SavedData {
 		for (Entry e : mine) restore(server, e);
 	}
 
-	/** SERVER_STARTED: nothing runs yet, so every listed block is a leftover of a crash. */
+	/**
+	 * SERVER_STARTED: nothing runs yet, so every listed block is a leftover of a crash. Never call it while events run
+	 * (it would restore their blocks too); use {@link #restore(MinecraftServer, UUID)} for one owner.
+	 */
 	public static void restoreAll(MinecraftServer server) {
 		TempBlockStore store = get(server);
 		if (store.entries.isEmpty()) return;
@@ -100,11 +106,15 @@ public final class TempBlockStore extends SavedData {
 		Chaosaholic.LOGGER.info("Restored {} temporary chaos blocks left over from the last run", all.size());
 	}
 
-	/** Puts the original back if the block is still what the event placed (a player's change is kept). */
+	/**
+	 * Puts the original back if the block is still the type the event placed (a player's change is kept). The type,
+	 * not the exact state: a placed fence or pane changes its connections when a neighbour changes, a falling anvil
+	 * may land rotated or chipped.
+	 */
 	private static void restore(MinecraftServer server, Entry e) {
 		ServerLevel level = server.getLevel(e.dimension());
 		if (level == null) return;
-		if (level.getBlockState(e.pos()) == e.placed()) {
+		if (level.getBlockState(e.pos()).is(e.placed().getBlock())) {
 			level.setBlock(e.pos(), e.original(), Block.UPDATE_ALL);
 		}
 	}

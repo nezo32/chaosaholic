@@ -17,7 +17,9 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 /**
  * Attribute modifiers for the run (scale, gravity, speed, ...). Always transient: vanilla never saves transient
  * modifiers, so a crash or a chunk unload cannot leave one behind. The modifier id is
- * {@code chaosaholic:event/<id>/<instance uuid>}, one per instance and attribute.
+ * {@code chaosaholic:event/<id>/<instance uuid>}, one per instance and attribute. Players are accepted only while
+ * {@link ActiveEvent#mayChange} allows it; the framework reverts a tracked player who stops being eligible, logs out,
+ * dies or leaves the dimension.
  */
 public final class TrackedModifiers {
 	private record Entry(LivingEntity entity, Holder<Attribute> attribute) {}
@@ -38,9 +40,10 @@ public final class TrackedModifiers {
 
 	/**
 	 * Adds (or updates) this instance's modifier on {@code attribute}. Returns false if the entity has no such
-	 * attribute. Example: {@code add(mob, Attributes.SCALE, -0.5, Operation.ADD_MULTIPLIED_TOTAL)} halves the size.
+	 * attribute or is a player this instance may not change ({@link ActiveEvent#mayChange}). Example: {@code add(mob, Attributes.SCALE, -0.5, Operation.ADD_MULTIPLIED_TOTAL)} halves the size.
 	 */
 	public boolean add(LivingEntity entity, Holder<Attribute> attribute, double amount, AttributeModifier.Operation operation) {
+		if (!owner.mayChange(entity)) return false;
 		AttributeInstance instance = entity.getAttribute(attribute);
 		if (instance == null) return false;
 		instance.addOrUpdateTransientModifier(new AttributeModifier(id, amount, operation));
@@ -76,6 +79,11 @@ public final class TrackedModifiers {
 		List<Entry> all = new ArrayList<>(entries);
 		entries.clear();
 		for (Entry e : all) remove(e);
+	}
+
+	/** Framework, once a second: reverts players this instance may no longer change (Creative, other dimension). */
+	public void prune() {
+		for (LivingEntity entity : entities()) if (!owner.mayChange(entity)) revert(entity);
 	}
 
 	/** Framework: the entity unloaded (transient modifiers were not saved with it). */

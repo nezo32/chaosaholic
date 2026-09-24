@@ -17,7 +17,6 @@ import dev.chaosaholic.event.RemoveReason;
 import dev.chaosaholic.event.StopReason;
 import dev.chaosaholic.event.helper.Spots;
 import dev.chaosaholic.event.helper.Warning;
-import dev.chaosaholic.event.impl.mob.MobWarning;
 import dev.chaosaholic.event.impl.mob.NoLoot;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -42,7 +41,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Bad: a wave of hostile mobs per affected player for 60-90 s. The spawn spots are chosen at the start and marked
- * with TRIAL_OMEN particles during the warning (3 s, 4 s on Hardcore, {@link MobWarning}); then
+ * with TRIAL_OMEN particles during the warning (3 s, 4 s on Hardcore, {@link Warning}); then
  * {@link #waveSize wave size} mobs (Easy 2, Normal 3, Hard/Hardcore 4) appear there, 8-12 blocks away on safe spots
  * (sturdy floor, room for the mob, never within {@link #MIN_PLAYER_DISTANCE} blocks of any player) and target that
  * player. Refused on Peaceful and when no safe spot exists.
@@ -123,7 +122,7 @@ public final class MobSurprise extends ChaosEvent {
 				}
 			});
 		}
-		MobWarning.thenRun(ev, () -> {
+		Warning.thenRun(ev, () -> {
 			for (ServerPlayer p : ev.players()) {
 				List<Vec3> spots = plan.get(p.getUUID());
 				if (spots != null) spawnWave(ev, p, spots);
@@ -221,5 +220,10 @@ public final class MobSurprise extends ChaosEvent {
 	@Override
 	public Holder<SoundEvent> startSound() {
 		return BuiltInRegistries.SOUND_EVENT.wrapAsHolder(SoundEvents.TRIAL_SPAWNER_OMINOUS_ACTIVATE);
+	}
+
+	@Override
+	public boolean hasWarning() {
+		return true; // Warning.thenRun(...) before every wave
 	}
 }

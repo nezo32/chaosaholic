@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.mojang.authlib.GameProfile;
+import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.Announcer;
 import dev.chaosaholic.event.ChaosEvent;
 import dev.chaosaholic.event.helper.Warning;
@@ -85,12 +86,12 @@ public class ChaosNotifyGameTests {
 	@GameTest
 	public void vanillaClientGetsTitleForBadEvents(GameTestHelper h) {
 		Mock mock = mockPlayer(h);
-		ChaosEvent bad = TestSupport.event("tnt_rain");
+		ChaosEvent bad = TestSupport.event("test_boom"); // BAD, no start sound of its own
 		Announcer.announce(mock.player(), bad, false);
 		List<Object> out = mock.drain();
 		h.assertValueEqual(count(out, ClientboundSetTitleTextPacket.class), 1L, "title; outbound=" + out);
 		h.assertValueEqual(count(out, ClientboundSetSubtitleTextPacket.class), 1L, "subtitle");
-		h.assertValueEqual(count(out, ClientboundSoundPacket.class), 1L, "category sting (no event sound yet)");
+		h.assertValueEqual(count(out, ClientboundSoundPacket.class), 1L, "category sting only; outbound=" + out);
 		TestSupport.leave(h, mock.player());
 		h.succeed();
 	}
@@ -122,6 +123,39 @@ public class ChaosNotifyGameTests {
 		h.assertValueEqual(count(out, ClientboundSoundPacket.class), 1L, "warning ping");
 		TestSupport.leave(h, mock.player());
 		h.succeed();
+	}
+
+	/**
+	 * Hardcore rule: at least {@code Warning.delay} ticks (3 s, 4 s on Hardcore) between the first warning the player
+	 * receives and the hazard. Both are observed the same way (packet / flag polled each tick), so the lag cancels out.
+	 */
+	@GameTest(maxTicks = 200)
+	public void warningPrecedesHazardByTheFullDelay(GameTestHelper h) {
+		TestSupport.defaults(h);
+		Mock mock = mockPlayer(h);
+		TestSupport.manager(h).observe(mock.player(), true);
+		ActiveEvent ev = TestSupport.start(h, "test_marker", mock.player());
+		mock.drain();
+		int delay = Warning.delay(ev.context());
+		boolean[] hazard = {false};
+		int[] firstPing = {-1};
+		int[] hazardSeen = {-1};
+		Warning.thenRun(ev, () -> hazard[0] = true);
+		h.startSequence()
+				.thenWaitUntil(() -> {
+					int now = h.getLevel().getServer().getTickCount();
+					boolean ping = mock.drain().stream().anyMatch(m -> m instanceof ClientboundSystemChatPacket p && p.overlay());
+					if (ping && firstPing[0] < 0) firstPing[0] = now;
+					if (hazard[0] && hazardSeen[0] < 0) hazardSeen[0] = now;
+					h.assertTrue(hazardSeen[0] >= 0, "hazard not yet");
+				})
+				.thenExecute(() -> {
+					h.assertTrue(firstPing[0] >= 0, "a warning was sent");
+					h.assertTrue(hazardSeen[0] - firstPing[0] >= delay,
+							"warning to hazard " + (hazardSeen[0] - firstPing[0]) + " ticks, need " + delay);
+					TestSupport.cleanup(h, mock.player());
+				})
+				.thenSucceed();
 	}
 
 	/** A running timed event sends boss bar packets to its players. */

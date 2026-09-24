@@ -5,32 +5,46 @@ import static dev.chaosaholic.test.TestSupport.defaults;
 import static dev.chaosaholic.test.TestSupport.leave;
 import static dev.chaosaholic.test.TestSupport.manager;
 import static dev.chaosaholic.test.TestSupport.mob;
+import static dev.chaosaholic.test.TestSupport.scale;
+import static dev.chaosaholic.test.TestSupport.server;
 import static dev.chaosaholic.test.TestSupport.survivalPlayer;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.EventManager;
 import dev.chaosaholic.event.StopReason;
+import dev.chaosaholic.event.helper.Area;
 import dev.chaosaholic.event.helper.Marks;
 import dev.chaosaholic.event.helper.OwnedEntities;
 import dev.chaosaholic.event.helper.TempBlockStore;
 import dev.chaosaholic.event.helper.TrackedNames;
+import dev.chaosaholic.mixin.MobEffectInstanceAccessor;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.chicken.Chicken;
 import net.minecraft.world.entity.animal.pig.Pig;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.monster.skeleton.Skeleton;
+import net.minecraft.world.entity.monster.spider.Spider;
 import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -49,7 +63,9 @@ public class ChaosLifecycleGameTests {
 		h.assertTrue(ev.hasBossBar(), "timed event has a bar");
 		h.assertTrue(ev.bossBarPlayers().contains(p), "bar shown to the player");
 		String bar = EventManager.barName(ev).getString();
-		h.assertTrue(bar.startsWith("Speed Demon — ") && bar.endsWith(" s"), "bar name (English fallback on the server): " + bar);
+		// under a minute "42 s", from a minute "1:00" (speed_demon rolls 30-60 s)
+		h.assertTrue(bar.startsWith("Speed Demon — ") && (bar.endsWith(" s") || bar.matches(".* \\d+:\\d\\d")),
+				"bar name (English fallback on the server): " + bar);
 		ev.setRemainingTicks(5);
 		h.startSequence()
 				.thenWaitUntil(() -> h.assertTrue(ev.isStopped(), "expired"))
@@ -214,8 +230,11 @@ public class ChaosLifecycleGameTests {
 				.thenSucceed();
 	}
 
-	/** Crash safety: temporary blocks left in the store (no running owner) are restored on the next start. */
-	@GameTest
+	/**
+	 * Crash safety: temporary blocks left in the store (no running owner) are restored on the next start.
+	 * restoreAll touches every running instance's blocks: global-state environment.
+	 */
+	@GameTest(environment = TestSupport.GLOBAL_STATE)
 	public void leftoverTempBlocksRestoredOnStart(GameTestHelper h) {
 		defaults(h);
 		TestEvents.ensureRegistered();
@@ -230,6 +249,186 @@ public class ChaosLifecycleGameTests {
 		h.assertValueEqual(TempBlockStore.get(h.getLevel().getServer()).count(ev.uuid()), 0, "store cleared");
 		manager(h).stop(ev, StopReason.FORCED);
 		cleanup(h, p);
+		h.succeed();
+	}
+
+	/**
+	 * One owner's blocks come back through TempBlockStore#restore without touching others; the check is by block
+	 * type, so a fence whose connections changed (a neighbour was built) is still restored.
+	 */
+	@GameTest
+	public void tempBlocksRestoredByTypeAndOwner(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 2, 1.5));
+		ActiveEvent mine = TestSupport.start(h, "test_marker", p);
+		ActiveEvent other = TestSupport.start(h, "feather_fall", p);
+		BlockPos fence = h.absolutePos(new BlockPos(1, 5, 1));
+		BlockPos kept = h.absolutePos(new BlockPos(3, 5, 1));
+		h.assertTrue(mine.blocks().set(fence, Blocks.OAK_FENCE.defaultBlockState()), "fence placed");
+		h.assertTrue(other.blocks().set(kept, Blocks.GLASS.defaultBlockState()), "other instance's glass");
+		h.getLevel().setBlockAndUpdate(fence.east(), Blocks.OAK_FENCE.defaultBlockState()); // a player builds next to it
+		h.assertFalse(h.getLevel().getBlockState(fence) == Blocks.OAK_FENCE.defaultBlockState(), "connections changed");
+		TempBlockStore.get(server(h)).restore(server(h), mine.uuid());
+		h.assertTrue(h.getLevel().getBlockState(fence).isAir(), "fence restored despite new connections");
+		h.assertTrue(h.getLevel().getBlockState(kept).is(Blocks.GLASS), "other owner untouched");
+		h.assertValueEqual(TempBlockStore.get(server(h)).count(other.uuid()), 1, "other owner still recorded");
+		h.getLevel().setBlockAndUpdate(fence.east(), Blocks.AIR.defaultBlockState());
+		cleanup(h, p);
+		h.assertTrue(h.getLevel().getBlockState(kept).isAir(), "other restored at its end");
+		h.succeed();
+	}
+
+	/** Vanilla keeps a weaker, longer effect hidden under ours: it must come back when the event ends. */
+	@GameTest
+	public void hiddenWeakerEffectSurvivesTheEvent(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		p.addEffect(new MobEffectInstance(MobEffects.SPEED, 9600, 0)); // Swiftness potion (8 min)
+		ActiveEvent ev = TestSupport.start(h, "speed_demon", p);
+		h.assertValueEqual(p.getEffect(MobEffects.SPEED).getAmplifier(), 2, "Speed III on top");
+		manager(h).stop(ev, StopReason.FORCED);
+		MobEffectInstance after = p.getEffect(MobEffects.SPEED);
+		h.assertTrue(after != null && after.getAmplifier() == 0, "Speed I back: " + after);
+		h.assertTrue(after.getDuration() > 9000 && after.getDuration() <= 9600, "remaining duration kept: " + after.getDuration());
+		// ours hidden under a stronger foreign effect is unlinked, never resurfaces
+		ActiveEvent again = TestSupport.start(h, "speed_demon", p); // Speed III over Speed I
+		p.addEffect(new MobEffectInstance(MobEffects.SPEED, 100, 3)); // short Speed IV on top: ours becomes hidden
+		manager(h).stop(again, StopReason.FORCED);
+		MobEffectInstance top = p.getEffect(MobEffects.SPEED);
+		h.assertTrue(top != null && top.getAmplifier() == 3, "foreign Speed IV left alone: " + top);
+		MobEffectInstance below = ((MobEffectInstanceAccessor) top).chaosaholic$getHiddenEffect();
+		h.assertTrue(below != null && below.getAmplifier() == 0, "ours unlinked, the potion still below: " + below);
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/**
+	 * Trackers refuse players the instance may not change (Creative, Spectator); an eligible bystander may be changed
+	 * (glow_party) and is reverted when it logs out, even though it is not an affected player.
+	 */
+	@GameTest
+	public void trackersRefuseIneligiblePlayers(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		ServerPlayer creative = survivalPlayer(h, new Vec3(2.5, 2, 1.5));
+		creative.setGameMode(GameType.CREATIVE);
+		ServerPlayer bystander = survivalPlayer(h, new Vec3(3.5, 2, 1.5));
+		ActiveEvent ev = TestSupport.start(h, "test_marker", p);
+		h.assertFalse(ev.effects().give(creative, MobEffects.GLOWING, 0), "creative refused (effect)");
+		h.assertFalse(creative.hasEffect(MobEffects.GLOWING), "creative untouched");
+		h.assertFalse(ev.modifiers().add(creative, Attributes.SCALE, -0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL), "creative refused (modifier)");
+		h.assertTrue(ev.effects().give(bystander, MobEffects.GLOWING, 0), "eligible bystander accepted");
+		h.assertTrue(ev.modifiers().add(bystander, Attributes.SCALE, -0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL), "bystander modifier");
+		leave(h, bystander);
+		h.assertFalse(bystander.hasEffect(MobEffects.GLOWING), "bystander reverted on logout (not saved with it)");
+		h.assertFalse(ev.effects().tracks(bystander) || ev.modifiers().tracks(bystander), "forgotten");
+		h.assertTrue(scale(bystander) > 0.99, "modifier removed");
+		cleanup(h, p, creative);
+		h.succeed();
+	}
+
+	/** Dimension change: the player leaves the instance (boss bar gone, effects reverted); bystanders are reverted too. */
+	@GameTest
+	public void dimensionChangeRemovesThePlayer(GameTestHelper h) {
+		defaults(h);
+		ServerLevel nether = server(h).getLevel(Level.NETHER);
+		h.assertTrue(nether != null, "the gametest world (flat, all dimensions) has a nether");
+		ServerPlayer p = survivalPlayer(h);
+		ServerPlayer bystander = survivalPlayer(h, new Vec3(3.5, 2, 1.5));
+		ActiveEvent ev = TestSupport.start(h, "speed_demon", p);
+		ActiveEvent marker = TestSupport.start(h, "test_marker", p);
+		h.assertTrue(marker.effects().give(bystander, MobEffects.SPEED, 0), "bystander changed");
+		h.assertTrue(p.hasEffect(MobEffects.SPEED) && ev.bossBarPlayers().contains(p), "running");
+		p.teleportTo(nether, 0.5, 100, 0.5, Set.of(), 0.0F, 0.0F, false);
+		bystander.teleportTo(nether, 2.5, 100, 0.5, Set.of(), 0.0F, 0.0F, false);
+		h.assertTrue(p.level() == nether, "moved");
+		h.assertFalse(ev.isAffected(p), "removed from the instance");
+		h.assertFalse(p.hasEffect(MobEffects.SPEED), "effects reverted");
+		h.assertTrue(ev.bossBarPlayers().isEmpty(), "boss bar removed");
+		h.assertFalse(bystander.hasEffect(MobEffects.SPEED), "bystander reverted");
+		h.assertTrue(manager(h).entries(p).isEmpty(), "client sync empty");
+		cleanup(h, p, bystander);
+		h.succeed();
+	}
+
+	/** A name tag used during the event wins over the stored original. */
+	@GameTest
+	public void nameTagDuringEventIsKept(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h, new Vec3(3.5, 2, 3.5));
+		Pig renamed = mob(h, EntityTypes.PIG, new Vec3(4.5, 2, 3.5));
+		Pig untouched = mob(h, EntityTypes.PIG, new Vec3(3.5, 2, 4.5));
+		ActiveEvent ev = TestSupport.start(h, "test_resources", p);
+		h.assertTrue(renamed.hasCustomName() && untouched.hasCustomName(), "both renamed");
+		renamed.setCustomName(Component.literal("Bacon")); // the player's name tag
+		manager(h).stop(ev, StopReason.FORCED);
+		h.assertValueEqual(renamed.getCustomName().getString(), "Bacon", "name tag kept");
+		h.assertFalse(renamed.hasAttached(Marks.NAME), "mark removed");
+		h.assertFalse(untouched.hasCustomName(), "the other one restored");
+		renamed.discard();
+		untouched.discard();
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/** Owned spawns bring no unowned side spawns: passengers are owned, zombies never call reinforcements. */
+	@GameTest
+	public void ownedSpawnsHaveNoSideSpawns(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		ActiveEvent ev = TestSupport.start(h, "test_marker", p);
+		Vec3 at = h.absoluteVec(new Vec3(3.5, 2, 3.5));
+		Spider spider = EntityTypes.SPIDER.create(h.getLevel(), EntitySpawnReason.TRIGGERED);
+		Skeleton rider = EntityTypes.SKELETON.create(h.getLevel(), EntitySpawnReason.JOCKEY);
+		h.assertTrue(spider != null && rider != null, "created");
+		spider.snapTo(at.x, at.y, at.z, 0.0F, 0.0F);
+		rider.snapTo(at.x, at.y, at.z, 0.0F, 0.0F);
+		spider.setNoAi(true);
+		rider.setNoAi(true);
+		rider.startRiding(spider, true, false);
+		h.assertTrue(ev.entities().spawn(spider) == spider, "spawned");
+		h.assertTrue(!rider.isRemoved() && rider.level() == h.getLevel() && ev.entities().owns(rider), "passenger added and owned");
+		h.assertTrue(OwnedEntities.isUnsaved(rider), "passenger never saved");
+		Zombie zombie = EntityTypes.ZOMBIE.create(h.getLevel(), EntitySpawnReason.TRIGGERED);
+		zombie.snapTo(at.x + 1, at.y, at.z, 0.0F, 0.0F);
+		zombie.setNoAi(true);
+		h.assertTrue(ev.entities().spawnMob(zombie, EntitySpawnReason.EVENT) == zombie, "zombie spawned");
+		h.assertTrue(zombie.getAttributeValue(Attributes.SPAWN_REINFORCEMENTS_CHANCE) == 0.0, "no reinforcements");
+		h.assertFalse(zombie.isPassenger(), "no chicken jockey");
+		manager(h).stop(ev, StopReason.FORCED);
+		h.assertTrue(spider.isRemoved() && rider.isRemoved() && zombie.isRemoved(), "all removed at the end");
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/** A replacement whose original cannot be restored stays as a normal entity instead of vanishing with it. */
+	@GameTest
+	public void failedRestoreKeepsTheReplacement(GameTestHelper h) {
+		Chicken chicken = mob(h, EntityTypes.CHICKEN, new Vec3(2.5, 2, 2.5));
+		CompoundTag broken = new CompoundTag();
+		broken.putString("id", "chaosaholic:no_such_entity");
+		chicken.addTag(Marks.OWNED_TAG);
+		chicken.setAttached(Marks.OWNER, new Marks.OwnerMark(UUID.randomUUID(), Optional.of(broken)));
+		OwnedEntities.revert(chicken);
+		h.assertFalse(chicken.isRemoved(), "replacement kept");
+		h.assertFalse(chicken.hasAttached(Marks.OWNER) || chicken.entityTags().contains(Marks.OWNED_TAG), "no longer owned");
+		chicken.discard();
+		h.succeed();
+	}
+
+	/** Fair game is mobs only: never an armor stand. */
+	@GameTest
+	public void armorStandIsNotFairGame(GameTestHelper h) {
+		ArmorStand stand = EntityTypes.ARMOR_STAND.create(h.getLevel(), EntitySpawnReason.TRIGGERED);
+		Vec3 at = h.absoluteVec(new Vec3(2.5, 2, 2.5));
+		stand.snapTo(at.x, at.y, at.z, 0.0F, 0.0F);
+		h.getLevel().addFreshEntity(stand);
+		Pig pig = mob(h, EntityTypes.PIG, new Vec3(3.5, 2, 2.5));
+		h.assertFalse(Area.isFairGame(stand), "armor stand");
+		h.assertTrue(Area.isFairGame(pig), "pig");
+		h.assertFalse(Area.mobs(h.getLevel(), at, 2).contains(stand), "not in Area.mobs");
+		stand.discard();
+		pig.discard();
 		h.succeed();
 	}
 

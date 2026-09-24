@@ -16,7 +16,8 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
  * if (ClientEventState.isActive("slippery")) ...                   // gameplay (movement prediction): always
  * if (ClientEventState.isActiveWithScreenEffects("screen_shake")) // cosmetic: respects the Screen effects setting
  * </pre>
- * Cleared on disconnect. Only filled on servers that run Chaosaholic.
+ * Cleared on disconnect. Only filled on servers that run Chaosaholic. The countdown stops while the game is paused
+ * (singleplayer menu), like the server's boss bar.
  */
 public final class ClientEventState {
 	private record Timer(int remaining, int total) {}
@@ -27,7 +28,10 @@ public final class ClientEventState {
 
 	public static void register() {
 		ClientPlayNetworking.registerGlobalReceiver(ActiveEventsPayload.TYPE, (payload, ctx) -> set(payload.events()));
-		ClientTickEvents.END_CLIENT_TICK.register(client -> tick());
+		// the integrated server stops ticking while singleplayer is paused: so does the countdown
+		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			if (!client.isPaused()) tick();
+		});
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ACTIVE.clear());
 	}
 

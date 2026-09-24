@@ -269,8 +269,67 @@ public class ChaosLevelGameTests {
 		TestSupport.start(h, "feather_fall", p);
 		h.assertValueEqual(manager(h).activeFor(p).size(), 2, "different events stack");
 		h.assertValueEqual(manager(h).activeCount(p), 2, "count");
-		h.assertTrue(ChaosLimits.MAX_ACTIVE_PER_PLAYER == 8, "cap");
 		cleanup(h, p);
+		h.succeed();
+	}
+
+	/**
+	 * At most 8 timed events per player: with every slot taken, a new level-up trigger stays queued (not dropped, not
+	 * started) until one event ends, then it starts from the queue.
+	 */
+	@GameTest(maxTicks = 200)
+	public void ninthTriggerWaitsForASlot(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		EventManager m = manager(h);
+		h.assertValueEqual(ChaosLimits.MAX_ACTIVE_PER_PLAYER, 8, "cap");
+		for (int i = 1; i <= TestEvents.SLOTS; i++) TestSupport.start(h, TestEvents.slot(i), p);
+		h.assertValueEqual(m.activeCount(p), 8, "all slots taken");
+		h.assertTrue(m.trigger(event("speed_demon"), p).isEmpty(), "forced start refused too");
+		p.giveExperienceLevels(1);
+		h.assertValueEqual(m.observe(p, true), 1, "queued");
+		int start = h.getLevel().getServer().getTickCount();
+		h.startSequence()
+				.thenWaitUntil(() -> h.assertTrue(h.getLevel().getServer().getTickCount() - start >= 3 * ChaosLimits.START_INTERVAL_TICKS, "waiting"))
+				.thenExecute(() -> {
+					h.assertValueEqual(m.pending(p), 1, "still queued after 3 s");
+					h.assertValueEqual(m.startedFromQueue(p), 0, "nothing started");
+					h.assertValueEqual(m.activeCount(p), 8, "still 8");
+					ActiveEvent first = m.find(event(TestEvents.slot(1)), p);
+					m.stop(first, StopReason.FORCED);
+				})
+				.thenWaitUntil(() -> h.assertValueEqual(m.startedFromQueue(p), 1, "started once a slot freed"))
+				.thenExecute(() -> {
+					h.assertValueEqual(m.pending(p), 0, "queue empty");
+					h.assertValueEqual(m.activeCount(p), 8, "the slot is used again");
+					h.assertTrue(m.activeFor(p).stream().anyMatch(ev -> TestSupport.SAFE_EVENTS.contains(ev.id())), "a safe event rolled");
+					cleanup(h, p);
+				})
+				.thenSucceed();
+	}
+
+	/** Logging out and in again (player data saved and loaded) never re-triggers old levels. */
+	@GameTest
+	public void reloginDoesNotFlood(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		EventManager m = manager(h);
+		p.giveExperienceLevels(10);
+		h.assertValueEqual(m.observe(p, false), 0, "levels while the mode is off: mark moves only");
+		h.assertValueEqual(p.getAttached(PlayerLevels.MARK), 10, "mark");
+		com.mojang.authlib.GameProfile profile = p.getGameProfile();
+		TestSupport.leave(h, p);
+		ServerPlayer back = TestSupport.relogin(h, profile);
+		try {
+			h.assertValueEqual(back.experienceLevel, 10, "levels loaded");
+			h.assertValueEqual(back.getAttached(PlayerLevels.MARK), 10, "mark loaded with the player");
+			h.assertValueEqual(m.observe(back, true), 0, "first observation after login");
+			h.assertValueEqual(m.pending(back), 0, "nothing queued");
+			back.giveExperienceLevels(1);
+			h.assertValueEqual(m.observe(back, true), 1, "only the new level");
+		} finally {
+			cleanup(h, back);
+		}
 		h.succeed();
 	}
 }

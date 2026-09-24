@@ -35,13 +35,23 @@ public final class Marks {
 		).apply(i, OwnerMark::new));
 	}
 
-	/** On a renamed entity: the owner instance and the original custom name / visibility. */
-	public record NameMark(UUID owner, Optional<Component> name, boolean visible) {
+	/**
+	 * On a renamed entity: the owner instance, the original custom name / visibility, and the name the event set
+	 * ({@code applied}; absent in marks written before it existed). The original is put back only while the entity
+	 * still carries the applied name, so a name tag used during the event wins.
+	 */
+	public record NameMark(UUID owner, Optional<Component> name, boolean visible, Optional<Component> applied) {
 		public static final Codec<NameMark> CODEC = RecordCodecBuilder.create(i -> i.group(
 				UUIDUtil.CODEC.fieldOf("owner").forGetter(NameMark::owner),
 				ComponentSerialization.CODEC.optionalFieldOf("name").forGetter(NameMark::name),
-				Codec.BOOL.optionalFieldOf("visible", false).forGetter(NameMark::visible)
+				Codec.BOOL.optionalFieldOf("visible", false).forGetter(NameMark::visible),
+				ComponentSerialization.CODEC.optionalFieldOf("applied").forGetter(NameMark::applied)
 		).apply(i, NameMark::new));
+
+		/** A mark without the applied name: restored unconditionally. */
+		public NameMark(UUID owner, Optional<Component> name, boolean visible) {
+			this(owner, name, visible, Optional.empty());
+		}
 	}
 
 	public static final AttachmentType<OwnerMark> OWNER = AttachmentRegistry.createPersistent(
