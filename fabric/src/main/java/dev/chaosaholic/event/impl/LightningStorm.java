@@ -84,9 +84,10 @@ public final class LightningStorm extends ChaosEvent {
 			s.striking = true;
 			s.strikeStart = ev.age();
 		});
-		// Distant thunder with the last warning ping (design/presentation.md §4); scheduled after the pings, so it plays after.
-		int lastPing = (Warning.delay(ev.context()) / ChaosLimits.TICKS_PER_SECOND - 1) * ChaosLimits.TICKS_PER_SECOND;
-		ev.schedule(Math.max(1, lastPing), () -> {
+		// Distant thunder with the last warning ping (design/presentation.md §4): Warning pings at 1, 21, 41 (, 61);
+		// scheduled after the pings, so on that tick it plays after the ping.
+		int lastPing = 1 + (Warning.delay(ev.context()) / ChaosLimits.TICKS_PER_SECOND - 1) * ChaosLimits.TICKS_PER_SECOND;
+		ev.schedule(lastPing, () -> {
 			for (ServerPlayer p : ev.players()) Sounds.play(p, SoundEvents.TRIDENT_THUNDER, 0.3F, 1.6F);
 		});
 	}

@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
@@ -136,6 +137,13 @@ public abstract class ChaosEvent {
 
 	/** ServerLivingEntityEvents.AFTER_DEATH of a non-player entity killed by a player (source.getEntity()). */
 	public void afterKill(ActiveEvent ev, ServerPlayer killer, LivingEntity victim, DamageSource source) {}
+
+	/**
+	 * ServerLivingEntityEvents.MOB_CONVERSION of a mob this instance owns (zombie → drowned, skeleton → stray, ...):
+	 * {@code converted} is already owned by the instance (it inherited the mark) but not yet in the level. Re-apply
+	 * per-mob settings that the conversion does not copy (loot, targets, ...).
+	 */
+	public void onOwnedConverted(ActiveEvent ev, Mob previous, Mob converted) {}
 
 	/** True for events that call helper.Warning: the lang file must then have {@code chaosaholic.event.<id>.warning}. */
 	public boolean hasWarning() {

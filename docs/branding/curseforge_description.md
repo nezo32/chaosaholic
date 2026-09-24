@@ -57,7 +57,7 @@ When Chaosaholic Mode is on, each experience level a player gains does the follo
 
 Difficulty and Hardcore settings are never changed, and events respect them: Mob Surprise, Bee Swarm and Hunger
 Games never start on Peaceful, difficulty sets the size of mob waves, and Hardcore gets a longer warning, longer TNT
-fuses and no lethal TNT or anvil hits.
+fuses and no lethal TNT, anvil or bee hits.
 
 ## Notification settings
 
@@ -109,15 +109,15 @@ Durations are random within the range. An event never has more than 180 s left, 
 
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
-| TNT Rain | Lit TNT falls around you, each spot marked with smoke | 15–20 s | 3 s warning. At most 12 TNT, 4–10 blocks away, skipped if you walk up to it. 4 s fuse, weaker than normal TNT (power 3). Blocks only break if `mob_griefing` is on, nothing explodes if `tnt_explodes` is off. Hardcore: longer fuses, and a blast that would kill you is cancelled |
-| Anvil Rain | Anvils crash down on marked spots near you | 15–20 s | 3 s warning, each spot marked with red dust before its anvil falls. At most 12 anvils, 2–8 blocks away, never where you stand. At most 3 hearts per hit; on Hardcore a lethal hit is cancelled. Anvils never become blocks or items |
-| Mob Surprise | A wave of hostile mobs shows up | 60–90 s | 3 s warning. 2 / 3 / 4 zombies, skeletons or spiders on Easy / Normal / Hard (Hardcore = Hard), 8–12 blocks away. No creepers, no loot, no XP. Nothing on Peaceful. Survivors vanish at the end |
+| TNT Rain | Lit TNT falls around you, each spot marked with smoke | 15–20 s | 3 s warning. At most 12 TNT, 4–10 blocks away, never next to any player, skipped if you walk up to it. 4 s fuse, weaker than normal TNT (power 3). Blocks only break if `mob_griefing` is on, nothing explodes if `tnt_explodes` is off. Hardcore: longer fuses, no knockback, and a blast that would kill you is cancelled |
+| Anvil Rain | Anvils crash down on marked spots near you | 15–20 s | 3 s warning, each spot marked with red dust before its anvil falls. At most 12 anvils, 2–8 blocks away, never where a player stands. At most 3 hearts per hit; on Hardcore a lethal hit is cancelled. Anvils never become blocks or items |
+| Mob Surprise | A wave of hostile mobs shows up | 60–90 s | 3 s warning. 2 / 3 / 4 zombies, skeletons or spiders on Easy / Normal / Hard (Hardcore = Hard), 8–12 blocks away. No creepers, no loot, no XP, no door breaking. Nothing on Peaceful. Survivors vanish at the end |
 | Hunger Games | Hunger III: your food bar drains fast | 30–45 s | Your food never drops below 1, so you can't starve on any difficulty |
 | Butterfingers | Every 5 s, a 35 % chance the item in your hand slips out | 30–45 s | At most 4 drops. Tossed on the ground like pressing Q, never while you're in the air or in lava, never destroyed |
 | Eternal Night | Midnight falls at once and holds | 60–120 s | Not in the Nether or the End. Sleeping can't skip it. The clock carries on normally at the end |
 | Lightning Storm | Lightning strikes around you | 15–20 s | 3 s warning, each spot sparks first. At most 8 bolts, 5–14 blocks away. Visual only: no damage, no fire |
 | Sluggish | Slowness II and Mining Fatigue I | 20–40 s | Ends with the event |
-| Bee Swarm | Angry bees come after you | 30–45 s | 3 s warning. 2 / 3 / 4 bees by difficulty, each stings once and flies off. Nothing on Peaceful. Removed at the end |
+| Bee Swarm | Angry bees come after you | 30–45 s | 3 s warning. 2 / 3 / 4 bees by difficulty, each stings once and flies off. On Hardcore a sting that would kill is cancelled. Nothing on Peaceful. Removed at the end |
 | Blackout | Darkness closes in | 5–10 s | Never longer than 10 s |
 
 ### 🌀 Weird
@@ -125,7 +125,7 @@ Durations are random within the range. An event never has more than 180 s left, 
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
 | Gravity Flip | You float up and drift down by turns | 20–30 s | Slow Falling all the way, at most 6 blocks up, always ends on a descent |
-| Chickenpocalypse | Mobs within 12 blocks turn into chickens | 30–60 s | At most 16 mobs. Bosses, pets, named and leashed mobs are left alone. Each chicken turns back into the exact mob it was (if the chicken dies, so does the mob) |
+| Chickenpocalypse | Mobs within 12 blocks turn into chickens | 30–60 s | At most 16 mobs. Bosses, pets, named and leashed mobs, villagers with a job, traders and player-built golems are left alone. Only players can hurt the chickens. Each chicken turns back into the exact mob it was (if a player kills the chicken, the mob is gone too) |
 | Tiny World | You and the mobs around you shrink to half size | 30–60 s | Radius 12. Bosses, pets and named mobs are left alone. Everyone grows back at the end |
 | Bouncy Floor | Landing bounces you like slime | 30–60 s | No fall damage while it lasts. Sneak to stop bouncing. Ends mid-bounce? 10 s of Slow Falling |
 | Upside Down | Mobs within 16 blocks flip upside down | 30–60 s | At most 32 mobs. Original names come back at the end |

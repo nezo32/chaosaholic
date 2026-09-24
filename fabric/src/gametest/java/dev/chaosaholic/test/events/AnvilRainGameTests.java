@@ -22,9 +22,12 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * anvil_rain: marks appear during the warning, anvils only after it, never on the player, capped damage, never
@@ -117,5 +120,41 @@ public class AnvilRainGameTests {
 
 	private static double sq(double d) {
 		return d * d;
+	}
+
+	/** Hardcore path of allowDamage: a lethal hit by an anvil of this instance is cancelled, other hits are not. */
+	@GameTest
+	public void hardcoreCancelsOnlyLethalOwnedAnvils(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		ActiveEvent ev = start(h, "anvil_rain", p);
+		FallingBlockEntity anvil = AnvilRain.drop(ev, h.absolutePos(new BlockPos(5, 30, 5)));
+		h.assertTrue(anvil != null, "anvil released in the sky");
+		DamageSource ours = h.getLevel().damageSources().anvil(anvil);
+		h.assertTrue(AnvilRain.isLethalHit(ev, p, ours, p.getHealth()), "lethal hit of our anvil");
+		h.assertFalse(AnvilRain.isLethalHit(ev, p, ours, p.getHealth() - 1.0F), "survivable hit goes through");
+		FallingBlockEntity other = FallingBlockEntity.fall(h.getLevel(), h.absolutePos(new BlockPos(6, 30, 6)), Blocks.ANVIL.defaultBlockState());
+		h.assertFalse(AnvilRain.isLethalHit(ev, p, h.getLevel().damageSources().anvil(other), p.getHealth()), "someone else's anvil");
+		other.discard();
+		h.assertTrue(event("anvil_rain").allowDamage(ev, p, ours, p.getHealth()) != ev.context().isHardcore(), "cancelled only on Hardcore");
+		manager(h).stop(ev, StopReason.FORCED);
+		h.assertTrue(anvil.isRemoved(), "anvil removed");
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/** Targets are never next to a bystander (a player the event does not affect) either. */
+	@GameTest
+	public void neverOnABystander(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 2, 1.5));
+		ServerPlayer bystander = survivalPlayer(h, new Vec3(7.5, 2, 1.5));
+		ActiveEvent ev = start(h, "anvil_rain", p);
+		h.assertFalse(ev.isAffected(bystander), "bystander not affected");
+		h.assertTrue(AnvilRain.drop(ev, bystander.blockPosition()) == null, "no anvil onto the bystander");
+		h.assertValueEqual(ev.entities().count(), 0, "nothing released");
+		manager(h).stop(ev, StopReason.FORCED);
+		cleanup(h, p, bystander);
+		h.succeed();
 	}
 }

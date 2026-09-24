@@ -21,10 +21,11 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.saveddata.WeatherData;
 
 /**
  * eternal_night. The world clock is server-global and only one instance may hold it, so everything runs in ONE test
- * (parallel tests of this class would refuse each other): midnight at start, held against a sleep-like jump,
+ * (parallel tests of this class would refuse each other): midnight at start, held against a sleep-like jump (and its weather reset),
  * extension by the same player, refusal for another player and in the Nether, restore on a forced stop and on
  * NO_PLAYERS (logout). It runs in its own batch (environment {@code chaosaholic-gametest:eternal_night}, an empty
  * all_of definition) so the night never reaches other tests.
@@ -58,11 +59,20 @@ public class EternalNightGameTests {
 		}
 		long[] held = new long[1];
 		ActiveEvent[] second = new ActiveEvent[1];
+		WeatherData weather = h.getLevel().getWeatherData();
+		WeatherData before = new WeatherData(weather.getClearWeatherTime(), weather.getRainTime(), weather.getThunderTime(),
+				weather.isRaining(), weather.isThundering());
 		h.startSequence()
-				.thenIdle(5)
+				.thenIdle(4)
+				.thenExecute(() -> {
+					weather.setRainTime(6000);
+					weather.setRaining(true);
+				})
+				.thenIdle(1)
 				.thenExecute(() -> {
 					held[0] = now(h);
-					h.setTime(held[0] + 6000); // what sleeping through the night does (jump to the morning)
+					h.setTime(held[0] + 6000); // what sleeping through the night does: jump to the morning, clear the weather
+					h.getLevel().resetWeatherCycle();
 				})
 				.thenIdle(2)
 				.thenExecute(() -> {
@@ -70,6 +80,12 @@ public class EternalNightGameTests {
 					h.assertTrue(t >= held[0] - 2 && t <= held[0] + 5, "sleep skip undone: " + held[0] + " -> " + t);
 					long d = day(t);
 					h.assertTrue(d >= EternalNight.NIGHT_START && d < EternalNight.NIGHT_END, "still night: " + d);
+					h.assertTrue(weather.isRaining() && weather.getRainTime() > 5900, "the rain the skip cleared is back: " + weather.getRainTime());
+					weather.setClearWeatherTime(before.getClearWeatherTime());
+					weather.setRainTime(before.getRainTime());
+					weather.setThunderTime(before.getThunderTime());
+					weather.setRaining(before.isRaining());
+					weather.setThundering(before.isThundering());
 				})
 				.thenIdle(20)
 				.thenExecute(() -> {

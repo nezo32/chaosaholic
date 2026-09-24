@@ -17,6 +17,7 @@ import dev.chaosaholic.core.Stacking;
 import dev.chaosaholic.core.TimeFormat;
 import dev.chaosaholic.core.TriggerQueue;
 import dev.chaosaholic.core.WeightedPicker;
+import dev.chaosaholic.event.helper.Marks;
 import dev.chaosaholic.event.helper.OwnedEntities;
 import dev.chaosaholic.event.helper.TempBlockStore;
 import dev.chaosaholic.event.helper.TrackedNames;
@@ -42,6 +43,7 @@ import net.minecraft.world.BossEvent;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -100,6 +102,7 @@ public final class EventManager {
 			TrackedNames.onEntityLoad(entity, level);
 		});
 		ServerLivingEntityEvents.MOB_CONVERSION.register((previous, converted, params) -> OwnedEntities.onConversion(previous, converted));
+		ServerLivingEntityEvents.MOB_CONVERSION.register((previous, converted, params) -> ownedConverted(previous, converted));
 		ServerEntityEvents.ENTITY_UNLOAD.register((entity, level) -> with(level.getServer(), m -> m.onUnload(entity)));
 	}
 
@@ -474,6 +477,16 @@ public final class EventManager {
 		if (source.getEntity() instanceof ServerPlayer killer) {
 			for (ActiveEvent ev : List.copyOf(m.active)) m.guarded(ev, () -> ev.event().afterKill(ev, killer, entity, source));
 		}
+	}
+
+	/** After OwnedEntities.onConversion: tells the owning (running) instance that one of its mobs converted. */
+	private static void ownedConverted(Mob previous, Mob converted) {
+		EventManager m = current;
+		Marks.OwnerMark mark = converted.getAttached(Marks.OWNER);
+		if (m == null || mark == null) return;
+		ActiveEvent ev = m.byUuid.get(mark.owner());
+		if (ev == null || ev.isStopped() || !ev.entities().owns(converted)) return;
+		m.guarded(ev, () -> ev.event().onOwnedConverted(ev, previous, converted));
 	}
 
 	private static boolean allowDamage(LivingEntity entity, DamageSource source, float amount) {

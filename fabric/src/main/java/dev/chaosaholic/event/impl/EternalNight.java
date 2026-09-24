@@ -15,6 +15,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.level.saveddata.WeatherData;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,25 +32,30 @@ import org.jspecify.annotations.Nullable;
  * After a crash mid-event the clock simply continues from the night.
  *
  * <p>Sleeping cannot skip it: when enough players sleep, vanilla wakes them and jumps to the morning; the jump is
- * undone on the same tick (as is any other external jump, e.g. /time set) and does not count as passed time. Night
+ * undone on the same tick (as is any other external jump, e.g. /time set) and does not count as passed time. The rain
+ * or thunder that the skipped night would have cleared comes back too (vanilla clears the weather with the jump). Night
  * mob spawning is plain vanilla (no extra wave).
  */
 public final class EternalNight extends ChaosEvent {
 	public static final long DAY_LENGTH = 24000L;
 	/** Clock time of day the night is set to. */
 	public static final long MIDNIGHT = 18000L;
-	/** Night range kept while active (13000 = dusk is over, 23000 = dawn). */
+	/** Night range kept while active (13000 = dusk is over; back to midnight at 22500, before dawn begins). */
 	public static final long NIGHT_START = 13000L;
 	public static final long NIGHT_END = 22500L;
 	/** A clock step up to this many ticks between two of our ticks counts as natural (clock rate changes included). */
 	private static final long NATURAL_STEP_MAX = 20L;
 
-	/** Per instance: the clock held, its time before the event, time that passed naturally, the last value seen. */
+	/**
+	 * Per instance: the clock held, its time before the event, time that passed naturally, the last value seen, and
+	 * the weather at the end of the previous tick (restored when a sleep skip cleared it).
+	 */
 	private static final class State {
 		private @Nullable Holder<WorldClock> clock;
 		private long before;
 		private long natural;
 		private long last;
+		private @Nullable WeatherData weather;
 	}
 
 	public EternalNight() {
@@ -99,10 +105,33 @@ public final class EternalNight extends ChaosEvent {
 			s.natural += delta;
 		} else {
 			now = set(ev, s, s.last); // sleeping through the night, /time set, ...: undone
+			restoreWeatherAfterSleep(ev.level(), s.weather);
 		}
 		long day = Math.floorMod(now, DAY_LENGTH);
 		if (day < NIGHT_START || day >= NIGHT_END) now = set(ev, s, now - day + MIDNIGHT); // dawn is near: back to midnight
 		s.last = now;
+		s.weather = copy(ev.level().getWeatherData());
+	}
+
+	/**
+	 * Vanilla clears rain and thunder when the players sleep through the night (ServerLevel#resetWeatherCycle, with
+	 * advanceWeather on). If the weather now looks exactly like that reset and it rained a tick ago, the previous
+	 * weather comes back.
+	 */
+	private static void restoreWeatherAfterSleep(ServerLevel level, @Nullable WeatherData before) {
+		WeatherData now = level.getWeatherData();
+		if (before == null || !before.isRaining()) return;
+		boolean reset = !now.isRaining() && !now.isThundering() && now.getRainTime() == 0 && now.getThunderTime() == 0;
+		if (!reset) return;
+		now.setClearWeatherTime(before.getClearWeatherTime());
+		now.setRainTime(before.getRainTime());
+		now.setThunderTime(before.getThunderTime());
+		now.setRaining(true);
+		now.setThundering(before.isThundering());
+	}
+
+	private static WeatherData copy(WeatherData w) {
+		return new WeatherData(w.getClearWeatherTime(), w.getRainTime(), w.getThunderTime(), w.isRaining(), w.isThundering());
 	}
 
 	@Override

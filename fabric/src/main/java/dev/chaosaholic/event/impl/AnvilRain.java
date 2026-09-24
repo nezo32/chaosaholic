@@ -33,7 +33,8 @@ import org.jspecify.annotations.Nullable;
  * 15-20 s.
  *
  * <p>Every {@link #INTERVAL_TICKS} one target per affected player is picked on a safe spot {@link #MIN_DISTANCE} to
- * {@link #MAX_DISTANCE} blocks away (never where a player stands) and marked with a red dust column. The anvil is
+ * {@link #MAX_DISTANCE} blocks away (never within {@link #MIN_DISTANCE} of any player, bystanders who are not affected
+ * included, Spectators excepted; an anvil whose target a player walked onto meanwhile is not released) and marked with a red dust column. The anvil is
  * released {@link #LEAD_TICKS} later from up to {@link #DROP_HEIGHT} blocks above the spot (lower under a roof) and
  * the mark stays until it lands. Marking starts during the warning, so the first marks are visible before anything
  * falls, and the first anvil is released exactly when the warning ends. At most {@link #MAX_ANVILS} per instance.
@@ -142,11 +143,7 @@ public final class AnvilRain extends ChaosEvent {
 		Optional<Vec3> found = Spots.near(ev.level(), player.position(), MIN_DISTANCE, MAX_DISTANCE, ev.random(), EntityTypes.FALLING_BLOCK);
 		if (found.isEmpty()) return false;
 		BlockPos pos = BlockPos.containing(found.get());
-		for (ServerPlayer p : ev.players()) {
-			double dx = p.getX() - (pos.getX() + 0.5);
-			double dz = p.getZ() - (pos.getZ() + 0.5);
-			if (dx * dx + dz * dz < MIN_DISTANCE * MIN_DISTANCE) return false;
-		}
+		if (!TntRain.farFromPlayers(ev.level(), Vec3.atBottomCenterOf(pos), MIN_DISTANCE)) return false;
 		for (Target t : s.targets) if (t.pos.equals(pos)) return false;
 		s.planned++;
 		s.targets.add(new Target(pos, ev.age() + LEAD_TICKS));
@@ -161,6 +158,7 @@ public final class AnvilRain extends ChaosEvent {
 	public static @Nullable FallingBlockEntity drop(ActiveEvent ev, BlockPos target) {
 		ServerLevel level = ev.level();
 		if (!ev.entities().canSpawn() || !level.getBlockState(target).isAir()) return null;
+		if (!TntRain.farFromPlayers(level, Vec3.atBottomCenterOf(target), MIN_DISTANCE)) return null;
 		int height = 0;
 		while (height < DROP_HEIGHT && level.getBlockState(target.above(height + 1)).isAir()) height++;
 		// fall() replaces the block at its position with air: only ever called on an air block
@@ -194,10 +192,14 @@ public final class AnvilRain extends ChaosEvent {
 	/** Hardcore: an anvil of this instance never kills a player outright (the lethal hit is cancelled). */
 	@Override
 	public boolean allowDamage(ActiveEvent ev, LivingEntity entity, DamageSource source, float amount) {
-		if (!ev.context().isHardcore() || !(entity instanceof ServerPlayer)) return true;
+		return !ev.context().isHardcore() || !isLethalHit(ev, entity, source, amount);
+	}
+
+	/** A hit by an anvil of this instance that would kill a player (cancelled on Hardcore). */
+	public static boolean isLethalHit(ActiveEvent ev, LivingEntity entity, DamageSource source, float amount) {
+		if (!(entity instanceof ServerPlayer)) return false;
 		Entity direct = source.getDirectEntity();
-		if (!(direct instanceof FallingBlockEntity) || !ev.entities().owns(direct)) return true;
-		return !TntRain.isLethal(entity, amount);
+		return direct instanceof FallingBlockEntity && ev.entities().owns(direct) && TntRain.isLethal(entity, amount);
 	}
 
 	@Override

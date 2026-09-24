@@ -11,6 +11,7 @@ import dev.chaosaholic.Chaosaholic;
 import dev.chaosaholic.core.ChaosLimits;
 import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.EventManager;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
@@ -27,6 +28,7 @@ import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -242,19 +244,40 @@ public final class OwnedEntities {
 		entity.discard();
 	}
 
-	/** Adds the original back at the replacement's position. False (nothing added) if that failed. */
+	/**
+	 * Adds the original back at the replacement's position ({@link #placeRestored} when it does not fit there).
+	 * False (nothing added) if that failed.
+	 */
 	private static boolean restore(ServerLevel level, Entity at, CompoundTag saved) {
 		try {
 			Entity original = EntityType.loadEntityRecursive(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), saved),
-					level, EntitySpawnReason.LOAD, e -> {
-						e.snapTo(at.getX(), at.getY(), at.getZ(), at.getYRot(), at.getXRot());
-						return e;
-					});
-			return original != null && level.tryAddFreshEntityWithPassengers(original) && !original.isRemoved();
+					level, EntitySpawnReason.LOAD, e -> e);
+			if (original == null) return false;
+			placeRestored(level, original, at);
+			return level.tryAddFreshEntityWithPassengers(original) && !original.isRemoved();
 		} catch (RuntimeException e) {
 			Chaosaholic.LOGGER.warn("Could not restore an entity replaced by a chaos event", e);
 			return false;
 		}
+	}
+
+	/**
+	 * Positions a restored {@code original} (loaded at its snapshot position) where the replacement {@code at} is. A
+	 * zombie does not fit everywhere its chicken went (a 1-block gap): then its snapshot position if loaded and free,
+	 * else the nearest safe standing spot in the replacement's column ({@link Spots#column}), else the replacement's
+	 * position.
+	 */
+	static void placeRestored(ServerLevel level, Entity original, Entity at) {
+		Vec3 snapshot = original.position();
+		original.snapTo(at.getX(), at.getY(), at.getZ(), at.getYRot(), at.getXRot());
+		if (level.noCollision(original)) return;
+		if (level.isLoaded(BlockPos.containing(snapshot))) {
+			original.snapTo(snapshot.x, snapshot.y, snapshot.z, at.getYRot(), at.getXRot());
+			if (level.noCollision(original)) return;
+		}
+		Optional<Vec3> spot = Spots.column(level, at.getBlockX(), at.getBlockY(), at.getBlockZ(), original.getType());
+		Vec3 pos = spot.orElse(at.position());
+		original.snapTo(pos.x, pos.y, pos.z, at.getYRot(), at.getXRot());
 	}
 
 	/**
