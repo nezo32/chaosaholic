@@ -23,10 +23,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityReference;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.bee.Bee;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -37,8 +39,9 @@ import org.jspecify.annotations.Nullable;
  * {@link #MIN_DISTANCE}-{@link #MAX_DISTANCE} blocks away, angry at that player (re-angered every second so vanilla's
  * anger timer never runs out during the run). Refused on Peaceful (bees would do no damage there).
  *
- * <p>Vanilla bee rules stay: each bee stings once (2 damage, poison on Normal/Hard, which never kills) and then
- * calms down. Instead of the vanilla slow death after stinging, a bee that has stung is removed with a puff within a
+ * <p>Vanilla bee rules stay: each bee stings once (2 damage, poison on Normal/Hard, which never kills: vanilla poison
+ * stops at half a heart) and then calms down. On Hardcore a sting that would kill is cancelled (the bee keeps trying,
+ * harmlessly, until the player heals or the event ends). Instead of the vanilla slow death after stinging, a bee that has stung is removed with a puff within a
  * second: nothing dies, nothing is left behind. The bees never enter hives (they would be saved inside the hive), drop
  * no experience ({@link NoLoot}) and are owned by the instance: never saved, removed at the end, and a player's
  * swarm leaves with that player (logout, death, Creative, dimension change). An extension sends a fresh swarm, at
@@ -166,6 +169,19 @@ public final class BeeSwarm extends ChaosEvent {
 				state.targets.remove(e.getUUID());
 			}
 		}
+	}
+
+	/** Hardcore: a sting of this instance never kills a player (poison cannot kill anyway). */
+	@Override
+	public boolean allowDamage(ActiveEvent ev, LivingEntity entity, DamageSource source, float amount) {
+		return !ev.context().isHardcore() || !isLethalSting(ev, entity, source, amount);
+	}
+
+	/** A sting by a bee of this instance that would kill a player (cancelled on Hardcore). */
+	public static boolean isLethalSting(ActiveEvent ev, LivingEntity entity, DamageSource source, float amount) {
+		if (!(entity instanceof ServerPlayer)) return false;
+		Entity direct = source.getDirectEntity();
+		return direct instanceof Bee && ev.entities().owns(direct) && TntRain.isLethal(entity, amount);
 	}
 
 	@Override

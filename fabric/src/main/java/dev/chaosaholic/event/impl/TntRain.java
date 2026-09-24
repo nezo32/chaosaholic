@@ -1,7 +1,6 @@
 package dev.chaosaholic.event.impl;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -25,7 +24,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.EntityBasedExplosionDamageCalculator;
 import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.ExplosionDamageCalculator;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.phys.Vec3;
@@ -36,8 +38,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Every {@link #INTERVAL_TICKS} one TNT per affected player is planned on a safe spot {@link #MIN_DISTANCE} to
  * {@link #MAX_DISTANCE} blocks away (horizontally), marked with smoke for {@link #MARK_TICKS}, and spawned up to
- * {@link #DROP_HEIGHT} blocks above it (never through a roof). If a player walked within {@link #MIN_DISTANCE} of
- * the spot meanwhile, that TNT is skipped. At most {@link #MAX_TNT} per instance (extensions included); no new TNT
+ * {@link #DROP_HEIGHT} blocks above it (never through a roof). No spot is ever within {@link #MIN_DISTANCE} of any
+ * player (bystanders who are not affected included, Spectators excepted); if one walked there meanwhile, that TNT is
+ * skipped. At most {@link #MAX_TNT} per instance (extensions included); no new TNT
  * once it could no longer explode before the event ends.
  *
  * <p>The TNT is owned (never saved, discarded when the event ends for any reason, so nothing is ever left lit).
@@ -45,7 +48,8 @@ import org.jspecify.annotations.Nullable;
  * {@link #POWER} using {@link Level.ExplosionInteraction#MOB}, which breaks blocks only when the {@code mobGriefing}
  * game rule is on, and nothing explodes when {@code tntExplodes} is off. Fuse {@link #FUSE_TICKS} (Hardcore
  * {@link #HARDCORE_FUSE_TICKS}), so every TNT gives several seconds to run. On Hardcore an explosion of this event
- * that would kill a player outright is cancelled.
+ * that would kill a player outright is cancelled, and the explosions never push players (no knockback off a ledge or
+ * into lava).
  */
 public final class TntRain extends ChaosEvent {
 	/** Per instance, extensions included. */
@@ -165,8 +169,22 @@ public final class TntRain extends ChaosEvent {
 			level.sendParticles(ParticleTypes.POOF, tnt.getX(), tnt.getY() + 0.5, tnt.getZ(), 8, 0.3, 0.3, 0.3, 0.02);
 			return;
 		}
-		level.explode(tnt, Explosion.getDefaultDamageSource(level, tnt), null, tnt.getX(), tnt.getY(0.0625), tnt.getZ(),
-				POWER, false, Level.ExplosionInteraction.MOB);
+		level.explode(tnt, Explosion.getDefaultDamageSource(level, tnt), damageCalculator(tnt, level.getServer().isHardcore()),
+				tnt.getX(), tnt.getY(0.0625), tnt.getZ(), POWER, false, Level.ExplosionInteraction.MOB);
+	}
+
+	/**
+	 * The vanilla calculator of a TNT explosion; on Hardcore without knockback for players (a cancelled lethal hit
+	 * would otherwise still throw them, and knockback alone can throw a player off a ledge or into lava).
+	 */
+	public static ExplosionDamageCalculator damageCalculator(PrimedTnt tnt, boolean hardcore) {
+		if (!hardcore) return new EntityBasedExplosionDamageCalculator(tnt);
+		return new EntityBasedExplosionDamageCalculator(tnt) {
+			@Override
+			public float getKnockbackMultiplier(Entity entity) {
+				return entity instanceof Player ? 0.0F : super.getKnockbackMultiplier(entity);
+			}
+		};
 	}
 
 	private static int fuse(ActiveEvent ev) {
@@ -174,11 +192,19 @@ public final class TntRain extends ChaosEvent {
 	}
 
 	private static boolean farFromPlayers(ActiveEvent ev, Vec3 spot) {
-		List<ServerPlayer> players = ev.players();
-		for (ServerPlayer p : players) {
+		return farFromPlayers(ev.level(), spot, MIN_DISTANCE);
+	}
+
+	/**
+	 * No player of {@code level} but Spectators (affected or not: a bystander never gets a hazard dropped on them)
+	 * within {@code min} blocks of {@code spot}, horizontally.
+	 */
+	public static boolean farFromPlayers(ServerLevel level, Vec3 spot, double min) {
+		for (Player p : level.players()) {
+			if (p.isSpectator()) continue;
 			double dx = p.getX() - spot.x;
 			double dz = p.getZ() - spot.z;
-			if (dx * dx + dz * dz < MIN_DISTANCE * MIN_DISTANCE) return false;
+			if (dx * dx + dz * dz < min * min) return false;
 		}
 		return true;
 	}
@@ -196,10 +222,14 @@ public final class TntRain extends ChaosEvent {
 	/** Hardcore: an explosion of this instance never kills a player outright (the lethal hit is cancelled). */
 	@Override
 	public boolean allowDamage(ActiveEvent ev, LivingEntity entity, DamageSource source, float amount) {
-		if (!ev.context().isHardcore() || !(entity instanceof ServerPlayer)) return true;
+		return !ev.context().isHardcore() || !isLethalHit(ev, entity, source, amount);
+	}
+
+	/** A hit by an explosion of this instance that would kill a player (cancelled on Hardcore). */
+	public static boolean isLethalHit(ActiveEvent ev, LivingEntity entity, DamageSource source, float amount) {
+		if (!(entity instanceof ServerPlayer)) return false;
 		Entity direct = source.getDirectEntity();
-		if (direct == null || !ev.state(State::new).tnt.contains(direct.getUUID())) return true;
-		return !isLethal(entity, amount);
+		return direct != null && ev.state(State::new).tnt.contains(direct.getUUID()) && isLethal(entity, amount);
 	}
 
 	/** {@code amount} (before armor) would kill {@code entity}. */

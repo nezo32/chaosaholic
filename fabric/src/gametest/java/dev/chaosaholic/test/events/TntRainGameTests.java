@@ -22,8 +22,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.animal.pig.Pig;
 import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.level.ExplosionDamageCalculator;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -155,5 +160,49 @@ public class TntRainGameTests {
 
 	private static double sq(double d) {
 		return d * d;
+	}
+
+	/** A player the event does not affect (a bystander) never gets TNT dropped next to them either. */
+	@GameTest
+	public void neverOnABystander(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 2, 1.5));
+		ServerPlayer bystander = survivalPlayer(h, new Vec3(7.5, 2, 1.5));
+		ActiveEvent ev = start(h, "tnt_rain", p);
+		h.assertFalse(ev.isAffected(bystander), "bystander not affected");
+		h.assertTrue(TntRain.spawn(ev, bystander.position()) == null, "no TNT on the bystander's feet");
+		h.assertTrue(TntRain.spawn(ev, bystander.position().add(2, 0, 0)) == null, "nor next to them");
+		h.assertValueEqual(ev.entities().count(), 0, "nothing spawned");
+		manager(h).stop(ev, StopReason.FORCED);
+		cleanup(h, p, bystander);
+		h.succeed();
+	}
+
+	/**
+	 * Hardcore paths (the test server is not Hardcore, so they are checked directly): a lethal hit by this
+	 * instance's TNT is cancelled, other hits are not, and on Hardcore the explosion pushes no player.
+	 */
+	@GameTest
+	public void hardcoreCancelsLethalHitsAndKnockback(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		ActiveEvent ev = start(h, "tnt_rain", p);
+		PrimedTnt tnt = TntRain.spawn(ev, h.absoluteVec(new Vec3(4.5, 40, 4.5)));
+		h.assertTrue(tnt != null, "spawned in the sky");
+		DamageSource ours = h.getLevel().damageSources().explosion(tnt, null);
+		h.assertTrue(TntRain.isLethalHit(ev, p, ours, p.getHealth()), "lethal hit of our TNT");
+		h.assertFalse(TntRain.isLethalHit(ev, p, ours, p.getHealth() - 1.0F), "survivable hit goes through");
+		PrimedTnt other = new PrimedTnt(h.getLevel(), tnt.getX(), tnt.getY(), tnt.getZ(), null);
+		h.assertFalse(TntRain.isLethalHit(ev, p, h.getLevel().damageSources().explosion(other, null), p.getHealth()), "someone else's TNT");
+		h.assertTrue(event("tnt_rain").allowDamage(ev, p, ours, p.getHealth()) != ev.context().isHardcore(), "cancelled only on Hardcore");
+		Pig pig = EntityTypes.PIG.create(h.getLevel(), EntitySpawnReason.EVENT);
+		ExplosionDamageCalculator hardcore = TntRain.damageCalculator(tnt, true);
+		h.assertValueEqual(hardcore.getKnockbackMultiplier(p), 0.0F, "Hardcore: no knockback for players");
+		h.assertValueEqual(hardcore.getKnockbackMultiplier(pig), 1.0F, "mobs are still pushed");
+		h.assertValueEqual(TntRain.damageCalculator(tnt, false).getKnockbackMultiplier(p), 1.0F, "vanilla knockback otherwise");
+		manager(h).stop(ev, StopReason.FORCED);
+		h.assertTrue(tnt.isRemoved(), "TNT removed");
+		cleanup(h, p);
+		h.succeed();
 	}
 }

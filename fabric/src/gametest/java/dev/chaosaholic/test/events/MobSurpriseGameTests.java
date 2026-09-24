@@ -23,6 +23,7 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.ConversionParams;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -30,6 +31,7 @@ import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.zombie.Drowned;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -159,5 +161,34 @@ public class MobSurpriseGameTests {
 		event.discard();
 		cleanup(h, p);
 		h.succeed();
+	}
+
+	/**
+	 * A wave mob that converts (here: into a drowned, as a zombie does under water) stays worthless to farm, owned,
+	 * breaks no doors and keeps hunting the same player.
+	 */
+	@GameTest(maxTicks = 200)
+	public void convertedWaveMobKeepsNoLootAndTarget(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		ActiveEvent ev = start(h, "mob_surprise", p);
+		h.startSequence()
+				.thenWaitUntil(() -> h.assertTrue(ev.entities().count() > 0, "wave"))
+				.thenExecute(() -> {
+					Mob mob = (Mob) ev.entities().list().getFirst();
+					h.assertTrue(MobSurprise.huntedBy(ev, mob) == p, "wave mob hunts the player");
+					Drowned d = mob.convertTo(EntityTypes.DROWNED, ConversionParams.single(mob, true, true), x -> {});
+					h.assertTrue(d != null && mob.isRemoved(), "converted");
+					h.assertTrue(ev.entities().owns(d), "the drowned is owned");
+					h.assertTrue(OwnedEntities.isUnsaved(d), "never saved");
+					h.assertTrue(NoLoot.isApplied(d), "no loot / xp / pickup after the conversion");
+					h.assertFalse(d.canBreakDoors(), "breaks no doors");
+					h.assertTrue(MobSurprise.huntedBy(ev, d) == p, "still hunts the player");
+					h.assertTrue(d.getTarget() == p, "targets the player at once");
+					manager(h).stop(ev, StopReason.FORCED);
+					h.assertTrue(d.isRemoved(), "discarded at the end");
+					cleanup(h, p);
+				})
+				.thenSucceed();
 	}
 }

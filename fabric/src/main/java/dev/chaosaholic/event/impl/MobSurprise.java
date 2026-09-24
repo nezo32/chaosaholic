@@ -47,13 +47,15 @@ import org.jspecify.annotations.Nullable;
  * player. Refused on Peaceful and when no safe spot exists.
  *
  * <p>Mob types: zombie, skeleton, spider; in daylight under the open sky husk or spider (no instant burning). No
- * creepers: their explosions would change the world permanently. Jockeys and baby zombies are suppressed.
+ * creepers: their explosions would change the world permanently. Jockeys and baby zombies are suppressed, and the
+ * zombies never break doors.
  *
  * <p>The mobs are owned by the instance (never saved, so a chunk unload or crash drops them) and discarded at the end
  * if still alive; a player's own wave also vanishes when that player leaves the event early (logout, death, Creative,
  * dimension change). No farming: they drop no loot, no equipment and no experience, cannot pick items up and call no
- * zombie reinforcements ({@link NoLoot}). An extension (rolled again) sends another wave after another warning; at
- * most {@link #MAX_ALIVE} of them are alive per instance.
+ * zombie reinforcements ({@link NoLoot}); a mob that converts (zombie → drowned, skeleton → stray) keeps all of that
+ * and its target. An extension (rolled again) sends another wave after another warning; at most {@link #MAX_ALIVE}
+ * of them are alive per instance, and a wave with no room left is not announced at all (no warning, no marks).
  */
 public final class MobSurprise extends ChaosEvent {
 	/** Horizontal spawn distance from the player, in blocks. */
@@ -106,14 +108,19 @@ public final class MobSurprise extends ChaosEvent {
 	/** Picks the spots now, marks them during the warning and spawns the wave when it runs out. */
 	private void announceWave(ActiveEvent ev, List<ServerPlayer> players) {
 		int size = waveSize(ev.context().difficulty());
+		int room = MAX_ALIVE - ev.entities().count(); // no marks for mobs that could not spawn
 		Map<UUID, List<Vec3>> plan = new LinkedHashMap<>();
 		for (ServerPlayer p : players) {
 			List<Vec3> spots = new ArrayList<>();
-			for (int i = 0; i < size; i++) {
-				Spots.near(ev.level(), p.position(), MIN_DISTANCE, MAX_DISTANCE, ev.random(), EntityTypes.ZOMBIE).ifPresent(spots::add);
+			for (int i = 0; i < size && room > 0; i++) {
+				Optional<Vec3> spot = Spots.near(ev.level(), p.position(), MIN_DISTANCE, MAX_DISTANCE, ev.random(), EntityTypes.ZOMBIE);
+				if (spot.isEmpty()) continue;
+				spots.add(spot.get());
+				room--;
 			}
-			plan.put(p.getUUID(), spots);
+			if (!spots.isEmpty()) plan.put(p.getUUID(), spots);
 		}
+		if (plan.isEmpty()) return; // capped (or no spot at all): no warning for a wave that would not come
 		int steps = Warning.delay(ev.context()) / ChaosLimits.TICKS_PER_SECOND;
 		for (int i = 0; i < steps; i++) {
 			ev.schedule(i * ChaosLimits.TICKS_PER_SECOND + 1, () -> {
@@ -159,6 +166,7 @@ public final class MobSurprise extends ChaosEvent {
 		mob.finalizeSpawn(level, level.getCurrentDifficultyAt(mob.blockPosition()), EntitySpawnReason.EVENT, data);
 		mob.ejectPassengers(); // spider jockey riders are never added to the level
 		NoLoot.apply(mob);
+		if (mob instanceof Zombie zombie) zombie.setCanBreakDoors(false);
 		mob.setPersistenceRequired(); // no natural despawn during the run; owned entities are never saved anyway
 		if (ev.entities().spawn(mob) == null) return null;
 		mob.setTarget(player);
@@ -186,6 +194,27 @@ public final class MobSurprise extends ChaosEvent {
 			ServerPlayer target = hunted(ev, state, mob);
 			if (target != null && mob.getTarget() != target) mob.setTarget(target);
 		}
+	}
+
+	/**
+	 * A wave mob converted (zombie drowning, skeleton freezing): the new mob gets no loot / experience again, breaks
+	 * no doors and hunts the same player.
+	 */
+	@Override
+	public void onOwnedConverted(ActiveEvent ev, Mob previous, Mob converted) {
+		NoLoot.apply(converted);
+		if (converted instanceof Zombie zombie) zombie.setCanBreakDoors(false);
+		State state = ev.state(State::new);
+		UUID player = state.targets.remove(previous.getUUID());
+		if (player == null) return;
+		state.targets.put(converted.getUUID(), player);
+		ServerPlayer target = hunted(ev, state, converted);
+		if (target != null) converted.setTarget(target);
+	}
+
+	/** The player {@code mob} hunts, while that player is still affected (for tests). */
+	public static @Nullable ServerPlayer huntedBy(ActiveEvent ev, Mob mob) {
+		return hunted(ev, ev.state(State::new), mob);
 	}
 
 	private static @Nullable ServerPlayer hunted(ActiveEvent ev, State state, Mob mob) {

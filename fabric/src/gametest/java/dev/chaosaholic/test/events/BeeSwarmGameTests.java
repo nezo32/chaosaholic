@@ -23,7 +23,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.animal.bee.Bee;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.storage.TagValueInput;
@@ -135,5 +138,28 @@ public class BeeSwarmGameTests {
 		h.assertValueEqual(BeeSwarm.swarmSize(Difficulty.HARD), BeeSwarm.MAX_BEES, "hard = cap");
 		cleanup(h, p, creative);
 		h.succeed();
+	}
+
+	/** Hardcore path of allowDamage: a lethal sting of an owned bee is cancelled, other stings are not. */
+	@GameTest(maxTicks = 200)
+	public void hardcoreCancelsOnlyLethalOwnedStings(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		ActiveEvent ev = start(h, "bee_swarm", p);
+		h.startSequence()
+				.thenWaitUntil(() -> h.assertTrue(ev.entities().count() > 0, "swarm"))
+				.thenExecute(() -> {
+					Bee bee = (Bee) ev.entities().list().getFirst();
+					DamageSource sting = h.getLevel().damageSources().sting(bee);
+					h.assertTrue(BeeSwarm.isLethalSting(ev, p, sting, p.getHealth()), "lethal sting of our bee");
+					h.assertFalse(BeeSwarm.isLethalSting(ev, p, sting, p.getHealth() - 1.0F), "survivable sting goes through");
+					Bee stranger = EntityTypes.BEE.create(h.getLevel(), EntitySpawnReason.EVENT);
+					h.assertFalse(BeeSwarm.isLethalSting(ev, p, h.getLevel().damageSources().sting(stranger), p.getHealth()),
+							"another bee: vanilla rules");
+					h.assertTrue(event("bee_swarm").allowDamage(ev, p, sting, p.getHealth()) || ev.context().isHardcore(),
+							"not Hardcore: nothing cancelled");
+					cleanup(h, p);
+				})
+				.thenSucceed();
 	}
 }
