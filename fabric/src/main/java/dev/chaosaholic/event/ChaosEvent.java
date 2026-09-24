@@ -86,6 +86,15 @@ public abstract class ChaosEvent {
 	}
 
 	/**
+	 * Longest remaining time of a run, in ticks, also after extensions (stacking): an extension never pushes the timer
+	 * (nor the boss bar's total) above it. Default: the framework cap {@link ChaosLimits#MAX_REMAINING_TICKS}; a
+	 * larger value is ignored. Override for events that must stay short however often they are rolled.
+	 */
+	public int maxRemainingTicks() {
+		return ChaosLimits.MAX_REMAINING_TICKS;
+	}
+
+	/**
 	 * Whether the event can start now for these players. False = it is not rolled (another event is rolled instead)
 	 * and /chaosaholic trigger reports "no valid target". Examples: no safe spot, Peaceful for a mob event.
 	 */

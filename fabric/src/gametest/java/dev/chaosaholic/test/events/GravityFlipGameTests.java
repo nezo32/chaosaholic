@@ -11,6 +11,7 @@ import static dev.chaosaholic.test.TestSupport.survivalPlayer;
 
 import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.StopReason;
+import dev.chaosaholic.event.helper.SafeLanding;
 import dev.chaosaholic.event.impl.GravityFlip;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -35,7 +36,7 @@ public class GravityFlipGameTests {
 		h.assertFalse(p.hasEffect(MobEffects.LEVITATION), "no levitation left");
 		MobEffectInstance tail = p.getEffect(MobEffects.SLOW_FALLING);
 		h.assertTrue(tail != null, "airborne player keeps a slow falling tail");
-		h.assertTrue(tail.getDuration() <= GravityFlip.SAFE_TAIL_TICKS, "tail is short: " + tail.getDuration());
+		h.assertTrue(tail.getDuration() <= SafeLanding.TAIL_TICKS, "tail is short: " + tail.getDuration());
 	}
 
 	@GameTest(maxTicks = 200)

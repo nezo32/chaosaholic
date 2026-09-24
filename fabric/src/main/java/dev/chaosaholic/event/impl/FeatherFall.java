@@ -3,18 +3,23 @@ package dev.chaosaholic.event.impl;
 import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.Category;
 import dev.chaosaholic.event.ChaosEvent;
+import dev.chaosaholic.event.RemoveReason;
+import dev.chaosaholic.event.helper.SafeLanding;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 
 /**
  * Good: no fall damage for 60-120 s. The reference "routed hook" event: the framework's single ALLOW_DAMAGE listener
- * asks every running instance; this one cancels fall damage of its affected players. Nothing to clean up.
+ * asks every running instance; this one cancels fall damage ({@link DamageTypes#FALL} only: ender pearls and
+ * stalagmites still hurt) of its affected players. A player still in the air when they leave the event (end, stop,
+ * logout, dimension change, Creative) gets the {@link SafeLanding} Slow Falling tail, so a drop taken under the event
+ * never lands with full damage.
  */
 public final class FeatherFall extends ChaosEvent {
 	public FeatherFall() {
@@ -27,8 +32,13 @@ public final class FeatherFall extends ChaosEvent {
 	}
 
 	@Override
+	public void onPlayerRemoved(ActiveEvent ev, ServerPlayer player, RemoveReason reason) {
+		SafeLanding.give(player, reason);
+	}
+
+	@Override
 	public boolean allowDamage(ActiveEvent ev, LivingEntity entity, DamageSource source, float amount) {
-		return !(source.is(DamageTypeTags.IS_FALL) && ev.isAffected(entity));
+		return !(source.is(DamageTypes.FALL) && ev.isAffected(entity));
 	}
 
 	@Override
