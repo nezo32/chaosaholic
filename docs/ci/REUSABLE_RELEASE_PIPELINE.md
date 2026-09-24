@@ -4,8 +4,10 @@ This is the default release pipeline for all of nezo32's projects. You push a Se
 the project, creates the GitHub release with the build outputs attached and, if the project is on CurseForge, uploads
 the files there.
 
-The pipeline is five reusable workflows (`on: workflow_call`) in this repository. They contain nothing
-Enchantaholic-specific: every project detail comes from the calling workflow's inputs and from repository variables.
+The pipeline is five reusable workflows (`on: workflow_call`). Their canonical home is
+[`nezo32/enchantaholic`](https://github.com/nezo32/enchantaholic); this repository (Chaosaholic) carries byte-identical
+copies, see [section 0](#0-chaosaholics-copy). They contain nothing project-specific: every project detail comes from
+the calling workflow's inputs and from repository variables.
 
 | Workflow | Does |
 |---|---|
@@ -15,13 +17,73 @@ Enchantaholic-specific: every project detail comes from the calling workflow's i
 | `reusable-github-release.yml` | Creates or updates the GitHub release for the tag, attaches the artifacts and generates the notes |
 | `reusable-publish-curseforge.yml` | Uploads the artifacts through the CurseForge Upload API (curl + jq, no third-party action) |
 
-Contents: [What it is](#1-what-it-is) · [Quick start](#2-quick-start) · [Build contract](#3-build-contract) ·
+Contents: [Chaosaholic's copy](#0-chaosaholics-copy) · [What it is](#1-what-it-is) · [Quick start](#2-quick-start) · [Build contract](#3-build-contract) ·
 [Reference](#4-reference) · [Recipes](#5-recipes) · [CurseForge names](#6-finding-curseforge-version-names) ·
 [Tag rules](#7-tag-rules) · [Re-running](#8-re-running-a-release) · [Security](#9-security) ·
 [Private host](#10-private-host-repository) · [Moving](#11-moving-to-a-dedicated-repository) ·
 [Alternatives](#12-alternatives)
 
-## 1. What it is
+## 0. Chaosaholic's copy
+
+**How Chaosaholic calls the pipeline.** `ci.yml` and `release.yml` call the reusable workflows by local path
+(`uses: ./.github/workflows/reusable-*.yml`), exactly like Enchantaholic does, and the files under
+`.github/workflows/reusable-*.yml`, `.github/templates/release-caller.yml`, `scripts/curseforge-upload.sh`,
+`scripts/check-inlined-script.sh`, `scripts/test/mock_curseforge.py` and `scripts/test/fixtures/` are verbatim copies
+of Enchantaholic's.
+
+Why local copies instead of `nezo32/enchantaholic/.github/workflows/...@<sha>` as the [Quick start](#2-quick-start)
+recommends for other repositories:
+
+- The pipeline is copied "as is", including its self-tests. The `scripts` CI job checks that the upload script inlined
+  in `reusable-publish-curseforge.yml` matches `scripts/curseforge-upload.sh`, and `actionlint` validates the
+  reusable workflows together with their callers. Both only mean something when the workflows that actually run are the
+  local ones.
+- A remote reference only works while `nezo32/enchantaholic` is public or grants Actions access to this repository
+  ([section 10](#10-private-host-repository)); local copies have no cross-repository dependency, and a pipeline fix
+  is tested by this repository's PR CI before it is released with.
+- The remote form is still one line per job away: when the pipeline moves to a dedicated repository
+  ([section 11](#11-moving-to-a-dedicated-repository)), replace the `./.github/workflows/` prefix with the pinned
+  remote one and delete the copies (plus the `scripts` job's inline check).
+
+The template in `.github/templates/release-caller.yml` keeps pointing at `nezo32/enchantaholic`, the canonical host,
+because that is what other repositories should call.
+
+**Keeping the copies in sync.** Change the pipeline in `nezo32/enchantaholic` first and copy the files over, or, if a
+change is made here, upstream it and record it below. A quick check from a sibling checkout:
+
+```bash
+for f in .github/workflows/reusable-*.yml .github/templates/release-caller.yml scripts/curseforge-upload.sh \
+         scripts/check-inlined-script.sh scripts/test/mock_curseforge.py scripts/test/fixtures/*; do
+  cmp -s "$f" "../enchantaholic/$f" || echo "differs: $f"
+done
+```
+
+### Changes vs the Enchantaholic copy / to upstream
+
+**Reusable workflows, template, upload script, inline check, mock and fixtures: no changes; they are
+byte-identical** to `nezo32/enchantaholic` at the time of copying (after `a3e3f7d`). Nothing needed parametrizing for a
+Java-only project:
+
+- no reusable workflow hardcodes Enchantaholic, its paths or its project ids;
+- no reusable workflow requires a Bedrock artifact. `reusable-build-node.yml` (default `artifact-files:
+  dist/*.mcaddon`) only runs when a caller has a Node job, and Chaosaholic has none; the file stays because it is part
+  of the shared pipeline. `reusable-github-release.yml` attaches whatever `artifact-pattern` selects (default `*`), and
+  `reusable-publish-curseforge.yml` only downloads the caller's `artifact-pattern`, with Java-host defaults
+  (`api-base`, `version-type-prefixes`).
+
+So there is nothing to upstream to the reusable files. Project-specific differences, all in callers or tests
+(not to upstream):
+
+| File | Difference from Enchantaholic |
+|---|---|
+| `.github/workflows/ci.yml` | No `addon` (Bedrock) job; required checks comment lists `mod / build` and `mod-26_2 / build` only; jar glob `chaosaholic-*.jar` |
+| `.github/workflows/release.yml` | No `build-addon` / `curseforge-addon` jobs; `github-release` needs only `build-mod` and attaches `fabric-mod` only; names, globs and default Environment `Chaosaholic`; relations `fabric-api:requiredDependency,modmenu:optionalDependency` (Mod Menu is an optional integration) |
+| `.github/labeler.yml` | No `bedrock` path label |
+| `.github/dependabot.yml` | No `npm` / `bedrock` entry |
+| `.github/pull_request_template.md` | Java-only local checks and testing hints |
+| `.gitignore` | Comment only mentions `fabric/.gitignore` |
+| `scripts/test/curseforge-upload.test.sh` | Dummy jar names `chaosaholic-*`; case (b) asserts the relations string Chaosaholic's `release.yml` passes (`fabric-api` + `modmenu`). The Bedrock-host cases stay: they test generic features of the shared script. The stronger (b) assertion could be upstreamed as-is |
+
 
 ```
 git push origin v1.2.0
@@ -82,7 +144,7 @@ For a new Fabric mod repository. For other project types, change step 5 by follo
 Optional but recommended: copy `.github/release.yml` (release-notes categories), `.github/labeler.yml` and
 `.github/workflows/labeler.yml` (branch prefix → label) from this repository. The generated release notes, and with
 them the CurseForge changelog, are then grouped into features, fixes and so on. In the copied `.github/labeler.yml`,
-delete or adapt the `fabric` / `bedrock` path rules at the end; they are specific to Enchantaholic's layout.
+delete or adapt the `fabric` path rule at the end; it is specific to this repository's layout.
 
 Before the first tag, commit `release.yml` to the default branch: a tag push runs the workflow file of the tagged
 commit, and the "Run workflow" button only appears for workflows on the default branch.
@@ -273,15 +335,17 @@ empty prefixes the script does not fetch it. All Bedrock versions share one type
 
 **Several artifacts from one repository (monorepo).** Use one build job per project, each with its own
 `artifact-name`; attach all of them with `artifact-pattern: "{a,b}"` on the release job, and use one CurseForge job per
-CurseForge project. Enchantaholic's own [`release.yml`](../../.github/workflows/release.yml) is a working example
-(a Fabric mod and a Bedrock add-on).
+CurseForge project. Enchantaholic's
+[`release.yml`](https://github.com/nezo32/enchantaholic/blob/main/.github/workflows/release.yml) is a working example
+(a Fabric mod and a Bedrock add-on); Chaosaholic's own [`release.yml`](../../.github/workflows/release.yml) is the
+single-Fabric-mod case.
 
 **CI for pull requests.** The build workflows also work without a version, so a project's `ci.yml` can reuse them:
 ```yaml
   build:
     uses: nezo32/enchantaholic/.github/workflows/reusable-build-gradle.yml@<sha>
 ```
-See Enchantaholic's [`ci.yml`](../../.github/workflows/ci.yml).
+See Chaosaholic's [`ci.yml`](../../.github/workflows/ci.yml) (it calls the local copies, see [section 0](#0-chaosaholics-copy)).
 
 ## 6. Finding CurseForge version names
 
@@ -387,7 +451,8 @@ The workflows live in `nezo32/enchantaholic` for now. The recommended next step 
    actionlint, shellcheck, the dry-run tests and the inline check.
 2. Tag it `v1.0.0` and a moving `v1` tag. Callers then use
    `nezo32/gh-workflows/.github/workflows/reusable-<x>.yml@v1` (or a SHA), and Dependabot updates them.
-3. Switch Enchantaholic's local `./.github/workflows/reusable-*.yml` references to the remote ones.
+3. Switch Enchantaholic's and Chaosaholic's local `./.github/workflows/reusable-*.yml` references to the remote
+   ones, and delete the local copies (and each repository's inline-script check).
 
 The interface stays identical, so callers only change the `uses:` prefix.
 
