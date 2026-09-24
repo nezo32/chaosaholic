@@ -8,24 +8,32 @@ Alt: *Every level is a coin flip. Sometimes the coin explodes.*
 > **Chaosaholic** turns every level-up into a dice roll. Each time you gain an experience level, a **random chaos
 > event** kicks off: sometimes **good** (Midas Hour, Double XP, Moon Jump), sometimes **bad** (TNT Rain, Anvil Rain,
 > Bee Swarm) and sometimes just **weird** (Chickenpocalypse, Sheep Disco, Gravity Flip). A boss bar counts down every
-> active event, a title and a sound tell you what just hit you, and dangerous events always give you a 3-second
-> warning. Farm XP at your own risk. The mode is a toggle on the world-creation screen, saved with the world, and
-> operators can flip it any time with `/chaosaholic on|off`, switch single events off, or trigger one on purpose.
+> active event, a title or an actionbar line and a sound tell you what just hit you, and dangerous events always give
+> you a 3-second warning. Only new levels count: spending levels and earning them back rolls nothing. The mode is a
+> toggle on the world-creation screen, saved with the world, and operators can flip it any time with
+> `/chaosaholic on|off`, switch single events off, tune how often each one rolls, or trigger one on purpose.
 > Each player can mute the event sound, hide the messages or turn off screen effects like camera shake.
 > A **Fabric mod for Java 26.2–26.3**.
 
 ## Features
+
+Same list as the CurseForge page (`curseforge_description.md` → Features); keep the two in sync.
+
 - 🎲 **Every level is a roll:** gain a level, get a random event. 30 of them, in three flavours.
 - 🍀 **Good, 😈 Bad, 🌀 Weird:** 9 blessings, 10 disasters, 11 things that make no sense at all.
-- ⏱️ **Always readable:** a coloured boss bar per active event with the time left, plus a title and a sound on start.
-- ⚠️ **Fair warning:** TNT Rain, Anvil Rain and Lightning Storm give a 3-second heads-up, and every hazard has a
-  safety cap (TNT and lightning never land right on you, spawned mobs and bees are removed when the event ends).
-- 🔁 **Everything goes back:** chickens turn back into the mobs they were, tiny things grow back, night gives the sun
-  back, anvils and party sheep are cleaned up.
+- 🔥 **Chaos stacks:** level up mid-event and another one starts; roll the same one again and it lasts longer.
+- ⏱️ **Always readable:** a coloured boss bar per active event with the time left, plus a title or actionbar line
+  and a sound on start.
+- ⚠️ **Fair warning:** TNT Rain, Anvil Rain and Lightning Storm give a 3-second heads-up (4 on Hardcore), hazards
+  never land right on you, and every event has a safety cap.
+- 🚫 **No farming:** only levels above your best since your last death count. Enchant, earn it back, nothing happens.
+- 🔁 **Everything goes back:** chickens turn back into the mobs they were, tiny things grow back, the sun comes back,
+  and spawned mobs, bees and party sheep vanish, even after a crash.
+- 👥 **Solo or everyone:** events hit only the player who levelled up, or every player in the same dimension.
 - ⚙️ **Toggle anywhere:** an ON/OFF button at world creation plus operator commands (`/chaosaholic`) for existing
-  worlds and servers: turn the mode on or off, switch single events off, list them, or trigger one yourself.
+  worlds and servers: turn the mode on or off, switch single events off, set their weights, or trigger one yourself.
 - 🔕 **Your call on noise:** turn the event sound, the messages or the screen effects off (Mod Menu or
-  `/chaosaholic-notify`). Danger warnings always come through.
+  `/chaosaholic-notify`). Boss bars and danger warnings always come through.
 - 🌍 **English and Russian** out of the box.
 
 ## CurseForge project settings (mirror Enchantaholic)
@@ -78,10 +86,14 @@ In-game text: category colours **Good `§a` (green)**, **Bad `§c` (red)**, **We
 
 ## Player-facing strings (en_us)
 
-Final key list is owned by the architect; this is the wording (Russian lives in `ru_ru.json`, same keys).
+The source of truth is `fabric/src/main/resources/assets/chaosaholic/lang/en_us.json`; `ru_ru.json` has exactly the
+same keys and placeholders (`LangFileTest`). Event keys are listed under [Event names](#event-names). Everything a
+player reads is a translation key: server-side text goes through `Texts.tr` (English fallback for vanilla clients).
 
 | Key | Text |
 |---|---|
+| `modmenu.summaryTranslation.chaosaholic` | Level up. Unleash chaos. Survive it. |
+| `modmenu.descriptionTranslation.chaosaholic` | Level up. Unleash chaos. Survive it. Every experience level you gain starts a random chaos event: good, bad or just weird. |
 | `chaosaholic.category.good` | Good |
 | `chaosaholic.category.bad` | Bad |
 | `chaosaholic.category.weird` | Weird |
@@ -90,12 +102,10 @@ Final key list is owned by the architect; this is the wording (Russian lives in 
 | `chaosaholic.time.minutes` | %1$s:%2$s |
 | `chaosaholic.announce.title` | %s |
 | `chaosaholic.announce.category` | %s event |
+| `chaosaholic.announce.actionbar` | ✦ %1$s · %2$s |
+| `chaosaholic.warning.format` | ⚠ %s |
 | `chaosaholic.createWorld.toggle` | Chaosaholic Mode |
 | `chaosaholic.createWorld.toggle.tooltip` | Every time you gain an experience level, a random chaos event starts: good, bad or just weird. Saved with this world. Operators can change it later with /chaosaholic on\|off. |
-| `chaosaholic.createWorld.scope` | Chaos Scope |
-| `chaosaholic.createWorld.scope.player` | Just Me |
-| `chaosaholic.createWorld.scope.world` | Everyone |
-| `chaosaholic.createWorld.scope.tooltip` | Just Me: an event hits only the player who levelled up. Everyone: it hits every player in the world. Operators can change it later with /chaosaholic scope player\|world. |
 | `chaosaholic.command.value.on` | ON |
 | `chaosaholic.command.value.off` | OFF |
 | `chaosaholic.command.on` | Chaosaholic Mode is now ON for this world |
@@ -107,13 +117,16 @@ Final key list is owned by the architect; this is the wording (Russian lives in 
 | `chaosaholic.command.scope.set` | Chaos scope is now: %s |
 | `chaosaholic.command.scope.status` | Chaos scope: %s |
 | `chaosaholic.command.scope.player` | only the player who levelled up |
-| `chaosaholic.command.scope.world` | every player in this world |
+| `chaosaholic.command.scope.world` | every player in the same dimension |
 | `chaosaholic.command.event.on` | %s can happen again in this world |
 | `chaosaholic.command.event.off` | %s will no longer happen in this world |
 | `chaosaholic.command.event.status` | %1$s: %2$s |
+| `chaosaholic.command.event.weight.set` | %1$s weight is now %2$s |
+| `chaosaholic.command.event.weight.status` | %1$s weight: %2$s |
 | `chaosaholic.command.events.header` | Chaos events (%1$s of %2$s enabled): |
-| `chaosaholic.command.events.line` | %1$s · %2$s · %3$s |
+| `chaosaholic.command.events.line` | %1$s · %2$s · %3$s · %4$s |
 | `chaosaholic.command.events.hover` | %1$s<br>/chaosaholic event %2$s on\|off |
+| `chaosaholic.command.events.weight` | weight %s |
 | `chaosaholic.command.trigger` | Started %1$s for %2$s |
 | `chaosaholic.command.trigger.random` | Rolled %1$s for %2$s |
 | `chaosaholic.command.stop` | Stopped active events: %s |
@@ -132,10 +145,24 @@ Final key list is owned by the architect; this is the wording (Russian lives in 
 | `chaosaholic.command.notify.sound` | Event sound: %s |
 | `chaosaholic.command.notify.message` | Event messages: %s |
 | `chaosaholic.command.notify.effects` | Screen effects: %s |
+
+Notes:
+
+- `chaosaholic.command.events.line` has four parts: name (category colour), category, ON/OFF, and
+  `chaosaholic.command.events.weight`. Hovering it shows `.hover` (description + the command), clicking it fills in
+  `/chaosaholic event <id> `.
+- `chaosaholic.command.value.on|off` are the ON/OFF words in command feedback; buttons use vanilla's own ON/OFF.
+- The announcement uses `.announce.title` (Bad: title + `.announce` subtitle) and `.announce.actionbar` (Good and
+  Weird); danger warnings use `chaosaholic.warning.format`.
+- Reserved, not used by the code yet: `chaosaholic.announce.category`, `chaosaholic.command.error.disabled`,
+  `chaosaholic.command.error.modeOff`.
+- There is no scope button on the Create World screen: scope is set with `/chaosaholic scope player|world`.
+
 **Announcement:** when an event starts, the player sees its name as a title in the category colour, with the
 `.announce` line as a gray subtitle (Bad events), or `✦ <name> · <announce>` on the actionbar (Good and Weird events).
 Build it with `Component.translatable(...)`, never by concatenating strings. The three dangerous events show their
-`.warning` line on the actionbar (`⚠`, gold) for 3 seconds before the first hazard, even when messages are off.
+`.warning` line on the actionbar (`chaosaholic.warning.format`, `⚠`, gold) for 3 seconds (4 on Hardcore) before the
+first hazard, even when messages and sounds are off.
 
 ## Event names
 

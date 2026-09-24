@@ -24,7 +24,7 @@
 	"chaosaholic.command.scope.set": "Chaos scope is now: %s",
 	"chaosaholic.command.scope.status": "Chaos scope: %s",
 	"chaosaholic.command.scope.player": "only the player who levelled up",
-	"chaosaholic.command.scope.world": "every player in this world",
+	"chaosaholic.command.scope.world": "every player in the same dimension",
 	"chaosaholic.command.event.on": "%s can happen again in this world",
 	"chaosaholic.command.event.off": "%s will no longer happen in this world",
 	"chaosaholic.command.event.status": "%1$s: %2$s",
