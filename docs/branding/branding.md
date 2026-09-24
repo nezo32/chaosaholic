@@ -35,8 +35,8 @@ Alt: *Every level is a coin flip. Sometimes the coin explodes.*
 | Project name | Chaosaholic |
 | Summary (short description) | Level up. Unleash chaos. Survive it. Every level-up starts a random good, bad or weird event. |
 | Logo | `docs/branding/curseforge_logo.png` (400×400) |
-| Main category | **Miscellaneous** *(maintainer: confirm, use the same main category as Enchantaholic's page)* |
-| Extra categories | **Adventure and RPG**, **Mobs**, **Fabric** loader tag *(maintainer: confirm against Enchantaholic's page; the page could not be fetched from the sandbox, CurseForge returns 403)* |
+| Main category | **Miscellaneous** |
+| Extra categories | **Adventure and RPG**, **Mobs**, **Fabric** loader tag |
 | Game versions | 26.2, 26.3, Fabric, Java 25, Client, Server (as `CURSEFORGE_GAME_VERSIONS`) |
 | Environment | Client and Server (the server does the chaos; the client part adds the Create World button, settings and screen shake) |
 | Dependencies | Fabric API (required), Mod Menu (optional) |
