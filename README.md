@@ -24,8 +24,8 @@ When the mode is on, each experience level a player gains does the following:
 4. **Roll:** one random event from the events that are switched on in this world, weighted by each event's weight.
    Good, Bad and Weird events share one pool. An event that can't start right now (Swap with no mob around, Mob
    Surprise on Peaceful) is rerolled.
-5. **Warning (dangerous events only):** TNT Rain, Anvil Rain and Lightning Storm show a ⚠ warning on the actionbar
-   and play a rising ping for 3 seconds (4 on Hardcore) before the first hazard.
+5. **Warning (dangerous events only):** TNT Rain, Anvil Rain, Lightning Storm, Mob Surprise and Bee Swarm show a ⚠
+   warning on the actionbar and play a rising ping for 3 seconds (4 on Hardcore) before the first hazard.
 6. **Start:** Bad events show their name as a title in red with a short subtitle. Good (green) and Weird (purple)
    events show `✦ Name · subtitle` on the actionbar. A sound plays.
 7. **Countdown:** a boss bar in the category colour shows the event and the time left (`Speed Demon — 42 s`,
@@ -68,50 +68,52 @@ left, even after extensions.
 
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
-| Midas Hour | Ores you mine drop double | 60–120 s <!-- sync --> | Only blocks in the `c:ores` tag. One extra drop roll per ore: Fortune applies, Silk Touch gives the ore block <!-- sync --> |
+| Midas Hour | Ores you mine drop their loot twice | 60–120 s | Only blocks in the `c:ores` tag, with the right tool, and only when `block_drops` is on. The bonus is a second, independent roll (Fortune rolls again). No bonus for drops that are the ore block itself: Silk Touch and self-dropping ores such as ancient debris get nothing extra, so ore blocks can't be duplicated |
 | Feather Fall | You take no fall damage | 60–120 s | Only fall damage is cancelled, nothing else |
-| Loot Piñata | Mobs you kill drop extra random loot | 60–120 s <!-- sync --> | 1–3 extra items per kill, none when the `doMobLoot` game rule is off <!-- sync --> |
+| Loot Piñata | Mobs you kill drop extra random loot | 60–120 s | 1–3 extra stacks of plain survival items per kill (food, ingots, gems, arrows, a rare golden apple or diamond), at most 48 stacks per event. Nothing from mobs spawned by other events, nothing when `mob_drops` is off |
 | Speed Demon | Speed III and Haste II | 30–60 s | Both effects end with the event |
-| Sky Chest | A chest full of random loot lands nearby. It's a normal chest and it's yours to keep | instant | Only on a safe, solid spot near you, never on you <!-- sync --> |
-| Double XP | Experience orbs you pick up count double | 60–120 s <!-- sync --> | Only orbs you pick up yourself. The extra XP can level you up, and that rolls another event |
-| Healing Aura | Regeneration II | 20–40 s <!-- sync --> | Ends with the event |
-| Iron Skin | Resistance II | 30–60 s <!-- sync --> | Ends with the event |
-| Moon Jump | Jump Boost III and no fall damage | 30–60 s <!-- sync --> | Fall damage is off for the whole event, so a big jump can't kill you <!-- sync --> |
+| Sky Chest | A chest lands 2–5 blocks from you, filled from a random vanilla structure loot table. It's a normal, permanent chest and it's yours to keep | instant | Only into an empty air block on a safe, solid spot inside the world border, never on you or any other mob. It never replaces a block. No spot, no chest: another event is rolled |
+| Double XP | Experience orbs you pick up give twice their points | 60–120 s | Only orbs (not `/xp` or advancements), and only what's left after Mending repaired your gear. The extra XP can level you up, and that rolls another event |
+| Healing Aura | Regeneration II | 20–40 s | Ends with the event |
+| Iron Skin | Resistance II (40 % less damage) | 30–60 s | Ends with the event |
+| Moon Jump | Jump Boost III and no fall damage | 30–60 s | No fall damage for the whole event. A jump still in the air when it ends lands without the boost: half a heart at most |
 
 ### 😈 Bad
 
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
-| TNT Rain | Lit TNT falls around you | 15–20 s <!-- sync --> | 3 s warning. At most 12 TNT, landing 4–10 blocks away, never on you. Fuse at least 3 s (4 s on Hardcore). Blocks break only when `mobGriefing` is on <!-- sync --> |
-| Anvil Rain | Anvils crash down on marked spots nearby | 15–20 s <!-- sync --> | 3 s warning. Each spot is marked with red particles at least 1 s before impact. Anvils never become blocks: nothing to clean up, nothing to farm <!-- sync --> |
-| Mob Surprise | A wave of hostile mobs shows up | 60–90 s <!-- sync --> | 2 / 3 / 4 mobs on Easy / Normal / Hard (Hardcore counts as Hard), 8–12 blocks away on safe spots. Never on Peaceful. Survivors vanish at the end <!-- sync --> |
-| Hunger Games | Hunger III: your food bar drains fast | 30–45 s <!-- sync --> | Vanilla starvation rules apply: keep food handy on Hard <!-- sync --> |
-| Butterfingers | Every few seconds the item in your hand may slip out | 30–45 s <!-- sync --> | The item is tossed on the ground like pressing Q, never destroyed <!-- sync --> |
-| Eternal Night | Night falls at once | 60–120 s <!-- sync --> | Overworld-like dimensions only. The clock goes back to where it would have been at the end, even on server stop <!-- sync --> |
-| Lightning Storm | Lightning strikes around you | 15–20 s <!-- sync --> | 3 s warning, a spark marks each spot first. At least 4 blocks from any player, no damage, no fire <!-- sync --> |
-| Sluggish | Slowness II and Mining Fatigue I | 20–40 s <!-- sync --> | Ends with the event |
-| Bee Swarm | A few angry bees come after you | 30–45 s <!-- sync --> | 3–5 bees. Removed at the end <!-- sync --> |
-| Blackout | Darkness closes in | 5–10 s <!-- sync --> | Short on purpose. Darkness, not Blindness |
+| TNT Rain | Lit TNT drops around you, one per second per player, each spot marked with smoke first | 15–20 s | 3 s warning (4 s on Hardcore). At most 12 TNT per event, 4–10 blocks away; a TNT is skipped if a player walked within 4 blocks of its spot. Fuse 4 s (5 s on Hardcore). Explosions are power 3 (vanilla TNT is 4), break blocks only when `mob_griefing` is on, and don't happen at all when `tnt_explodes` is off. On Hardcore a blast that would kill you is cancelled. Unexploded TNT vanishes at the end |
+| Anvil Rain | Anvils crash down on spots near you, one per second per player | 15–20 s | 3 s warning (4 s on Hardcore); each spot is marked with a red dust column 1.5 s before its anvil is released. At most 12 anvils per event, 2–8 blocks away, never where a player stands. At most 6 damage per hit (3 hearts), so one anvil can't kill you from full health; on Hardcore a hit that would kill is cancelled. Anvils never become blocks or items |
+| Mob Surprise | A wave of hostile mobs shows up and comes for you | 60–90 s | 3 s warning (4 s on Hardcore) with the spawn spots marked. 2 / 3 / 4 mobs on Easy / Normal / Hard (Hardcore counts as Hard), 8–12 blocks away on safe spots, never within 6 blocks of a player. Zombies, skeletons and spiders (husks and spiders in daylight, so nothing burns). No creepers, no jockeys, no baby zombies. They drop no loot or XP and call no reinforcements. At most 12 alive per event. Never on Peaceful. Survivors vanish at the end |
+| Hunger Games | Hunger III: your food bar drains fast | 30–45 s | Your food level never drops below 1, so you can't starve on any difficulty. Never on Peaceful |
+| Butterfingers | Every 5 seconds, a 35 % chance that the stack in your hand slips out | 30–45 s | At most 4 drops per player per event, never in the first 3 seconds. Tossed like pressing Q (at your feet if the spot ahead is lava, fire or a drop), never while you're in the air or in lava. Nothing is destroyed: the items are yours to pick up |
+| Eternal Night | Midnight falls at once and holds | 60–120 s | Only in dimensions with a day clock (not the Nether or the End). Sleeping or `/time set` can't skip it. At the end the clock carries on as if the night had never happened, even on server stop. One Eternal Night per dimension at a time (rolling it again extends it) |
+| Lightning Storm | Lightning strikes around you, every 2 seconds per player, each spot sparking first | 15–20 s | 3 s warning (4 s on Hardcore). At most 8 strikes per event, 5–14 blocks away; a strike is skipped if a player is within 4 blocks of its spot. The bolts are **visual only**: flash and thunder, but no damage, no fire, no charged creepers or witches, no changed blocks |
+| Sluggish | Slowness II and Mining Fatigue I | 20–40 s | Ends with the event |
+| Bee Swarm | Angry bees come after you | 30–45 s | 3 s warning (4 s on Hardcore). 2 / 3 / 4 bees on Easy / Normal / Hard, 4–7 blocks away, at most 4 alive per player. Each bee stings once and then leaves with a puff (no bee dies on you). They drop no XP, never enter hives, and vanish at the end. Never on Peaceful |
+| Blackout | Darkness closes in | 5–10 s | Darkness, not Blindness. Never more than 10 s left, even when rolled again |
 
 ### 🌀 Weird
 
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
-| Gravity Flip | You float up and drift down by turns | 20–30 s <!-- sync --> | Always ends on slow falling, so it can't drop you to your death <!-- sync --> |
-| Chickenpocalypse | Nearby mobs turn into chickens | 30–60 s <!-- sync --> | At most 16 mobs <!-- sync -->. Bosses, players, pets and named mobs are left alone. Each chicken turns back into the exact mob it was, even after a crash. If the chicken dies, so does the mob |
+| Gravity Flip | You float up (Levitation II, 3 s) and drift down (4 s) by turns | 20–30 s | Slow Falling for the whole event, so every descent is soft. You never rise more than 6 blocks above the ground, the last 5 seconds are always a descent, and if the event ends while you're in the air you get 10 s of Slow Falling to land |
+| Chickenpocalypse | Mobs within 12 blocks turn into chickens (babies into chicks) | 30–60 s | At most 16 mobs, nearest first. Players, bosses, pets, named mobs, riders, leashed mobs and mobs in water are left alone. Each chicken turns back into the exact mob it was (health, gear, trades…), even after a chunk reload or a crash. If the chicken dies, the mob is gone for good |
 | Tiny World | You and the mobs around you shrink to half size | 30–60 s | Radius 12 blocks, at most 64 mobs. Bosses, pets, named mobs and riders are left alone. Everyone grows back at the end (the change is never saved, so it can't stick) |
-| Bouncy Floor | Landing bounces you like slime | 30–60 s <!-- sync --> | No fall damage while it lasts. Sneak to land without bouncing |
-| Upside Down | Nearby mobs flip upside down | 30–60 s <!-- sync --> | Bosses, pets and named mobs are left alone. Original names come back at the end, even after a crash <!-- sync --> |
-| Swap | You swap places with a random nearby mob | instant | Only with a mob within 16 blocks. No mob, no swap: another event is rolled <!-- sync --> |
-| Sheep Disco | Rainbow sheep show up and start a party | 30–45 s <!-- sync --> | 3–5 sheep. They leave at the end (no free wool farm) <!-- sync --> |
-| Slippery | Every block feels like ice | 30–45 s <!-- sync --> | Ends with the event |
-| Random Teleport | You teleport to a random safe spot nearby | instant | 8–24 blocks away, only onto a safe, solid spot (works in caves) <!-- sync --> |
-| Screen Shake | Your camera wobbles | 10–15 s <!-- sync --> | Client only, small and smooth. Off if you turned screen effects off |
-| Glow Party | Everything nearby glows, even through walls | 30–60 s <!-- sync --> | Radius 16 blocks <!-- sync -->. Ends with the event |
+| Bouncy Floor | Landing bounces you back up like a slime block | 30–60 s | No fall damage while it lasts. Sneak to land without bouncing |
+| Upside Down | Mobs within 16 blocks are renamed Dinnerbone and flip upside down | 30–60 s | At most 32 mobs; mobs that walk in later flip too. Players and bosses never flip. The flip name is never shown. Original names come back at the end, even after a crash; a mob you name-tag during the event keeps its new name |
+| Swap | You swap places with a random mob within 16 blocks | instant | Only mobs that aren't bosses, pets, named or riding, and only when both spots are safe for both of you. Speed and fall distance are reset, so the swap can't hurt or save anyone. Not while you ride something. No mob, no swap: another event is rolled |
+| Sheep Disco | 3–5 rainbow sheep appear 2–5 blocks around you and dance to a note-block tune | 30–45 s | The sheep can't be hurt, sheared or bred (no free wool, mutton or XP). They leave at the end without dropping anything |
+| Slippery | Every block feels like ice, for you and up to 16 mobs within 8 blocks | 30–45 s | Ends with the event (the change is never saved) |
+| Random Teleport | You teleport to a random safe spot 8–24 blocks away | instant | Same dimension, a loaded chunk inside the world border, solid floor, no liquid or hazard (works in caves and the Nether). You land with no fall damage. No safe spot: another event is rolled |
+| Screen Shake | Your camera wobbles | 10–15 s | Client side, at most 1.5°, eased in and out. Needs the mod on your client; off if you turned screen effects off |
+| Glow Party | You and everything within 16 blocks glow, even through walls | 30–60 s | At most 48 entities; newcomers light up too. Creative and Spectator players are never picked. Ends with the event |
 
-**Fair play:** mobs, TNT, anvils, bees and sheep that events spawn are never saved with the world: when the event
-ends, the chunk unloads or the server crashes, they're gone. Their drops can't be farmed. Effects given by an event
-come back if you drink milk, until the event ends.
+**Fair play:** mobs, TNT, anvils, bees, sheep and lightning bolts that events spawn are never saved with the world:
+when the event ends, the chunk unloads or the server crashes, they're gone. None of them can be farmed: Mob Surprise
+mobs and bees drop no loot or XP, disco sheep can't be hurt, sheared or bred, anvils never become items, Loot Piñata
+has a per-event cap and Midas Hour never doubles ore blocks. Effects given by an event come back if you drink milk,
+until the event ends.
 
 ## Rules of the chaos
 
@@ -128,7 +130,7 @@ the player (`chaosaholic:level_mark`). Only levels **above the mark** start even
 - The first time the mod sees a player (a world from before the mod, a new player joining), the mark is set to their
   current level. Nothing floods.
 - **Death resets the mark.** The respawned player starts a new mark at their level after respawning. Normally that
-  is 0, so every level you earn back counts again: dying is the price. With the `keepInventory` game rule on you keep
+  is 0, so every level you earn back counts again: dying is the price. With the `keep_inventory` game rule on you keep
   your levels, so the new mark is the level you respawn with. Levels you had spent before dying (say you reached 30,
   spent down to 10, then died) count again when you earn them back.
 - Double XP can level you up, and those levels count like any other. That's the point.
@@ -160,11 +162,15 @@ death, when they switch to Creative or Spectator, and when the mode is switched 
 
 Bad events never make a death unavoidable:
 
-- every hazard (TNT, anvils, lightning) comes after a 3-second warning, 4 seconds on Hardcore;
-- hazards land around you, never on your exact spot;
-- movement events end in a safe state (Gravity Flip ends on slow falling);
-- mob events spawn nothing on Peaceful. Difficulty sets the wave size, and Hardcore counts as Hard;
-- `mobGriefing` decides whether explosions break blocks.
+- every hazard (TNT, anvils, lightning, mobs, bees) comes after a 3-second warning, 4 seconds on Hardcore, and
+  TNT, anvil and lightning spots are marked before anything lands;
+- hazards land around you, never on your spot: a TNT or a bolt whose spot a player walked up to is skipped;
+- one anvil hit deals at most 6 damage, lightning is visual only, and Hunger Games never lets you starve;
+- on Hardcore, a TNT blast or anvil hit that would kill you is cancelled, and TNT fuses are a second longer;
+- movement events end in a safe state (Gravity Flip always ends on slow falling);
+- Mob Surprise, Bee Swarm and Hunger Games never start on Peaceful. Difficulty sets the wave and swarm size, and
+  Hardcore counts as Hard;
+- `mob_griefing` decides whether TNT Rain breaks blocks, and `tnt_explodes` off means it doesn't explode at all.
 
 ### Cleanup guarantees
 
@@ -229,10 +235,17 @@ wobble; players without it can still join and play.
 
 - Double XP can level you up, and a level-up rolls another event. XP farms get *very* lively.
 - Eternal Night moves the clock of the whole dimension, so every player there gets the night, not only the affected
-  ones. <!-- sync -->
-- Chickenpocalypse is permanent for a chicken that dies: the original mob is gone with it.
+  ones. Nobody can sleep it away while it lasts. If the server crashes during it, the clock simply carries on from
+  that night.
+- Screen Shake is invisible without the mod on your client (or with screen effects off): you only get the boss bar
+  and the sound.
+- Upside Down renames mobs to Dinnerbone for a while. Pets and name-tagged mobs flip too; their names come back at
+  the end.
+- Chickenpocalypse chickens keep the original mob inside them: kill the chicken and the mob is gone for good, and
+  you only get what a chicken drops, not the mob's gear.
+- Butterfingers drops can land where other players or mobs pick them up. Pick yours up quickly.
 - Tiny World uses vanilla's scale attribute, so your reach and step height shrink with you.
-- TNT Rain follows the `mobGriefing` game rule: with it on, the TNT breaks blocks like normal TNT.
+- TNT Rain follows the `mob_griefing` game rule: with it on, the TNT breaks blocks like normal TNT.
 - Milk only helps for a second: an event's effects come back until the event ends.
 - A player with 8 running events keeps their level-ups in the queue (up to 10); the queue lives in memory, so pending
   level-ups are lost when the server stops.

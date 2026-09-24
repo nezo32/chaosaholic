@@ -24,8 +24,8 @@ Same list as the CurseForge page (`curseforge_description.md` → Features); kee
 - 🔥 **Chaos stacks:** level up mid-event and another one starts; roll the same one again and it lasts longer.
 - ⏱️ **Always readable:** a coloured boss bar per active event with the time left, plus a title or actionbar line
   and a sound on start.
-- ⚠️ **Fair warning:** TNT Rain, Anvil Rain and Lightning Storm give a 3-second heads-up (4 on Hardcore), hazards
-  never land right on you, and every event has a safety cap.
+- ⚠️ **Fair warning:** TNT Rain, Anvil Rain, Lightning Storm, Mob Surprise and Bee Swarm give a 3-second heads-up
+  (4 on Hardcore), hazards never land right on you, and every event has a safety cap.
 - 🚫 **No farming:** only levels above your best since your last death count. Enchant, earn it back, nothing happens.
 - 🔁 **Everything goes back:** chickens turn back into the mobs they were, tiny things grow back, the sun comes back,
   and spawned mobs, bees and party sheep vanish, even after a crash.
@@ -162,7 +162,8 @@ Notes:
 `.announce` line as a gray subtitle (Bad events), or `✦ <name> · <announce>` on the actionbar (Good and Weird events).
 Build it with `Component.translatable(...)`, never by concatenating strings. The three dangerous events show their
 `.warning` line on the actionbar (`chaosaholic.warning.format`, `⚠`, gold) for 3 seconds (4 on Hardcore) before the
-first hazard, even when messages and sounds are off.
+first hazard, even when messages and sounds are off. Mob Surprise and Bee Swarm have no `.warning` key: their
+warning shows `⚠ <event name>` in the same style.
 
 ## Event names
 
