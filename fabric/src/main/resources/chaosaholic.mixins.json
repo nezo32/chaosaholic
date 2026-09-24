@@ -6,7 +6,8 @@
 		"EntityMixin",
 		"ExperienceOrbMixin",
 		"LevelStorageAccessMixin",
-		"MinecraftServerAccessor"
+		"MinecraftServerAccessor",
+		"SheepMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
