@@ -17,6 +17,7 @@ import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.SpawnGroupData;
@@ -36,8 +37,9 @@ import org.jspecify.annotations.Nullable;
  * {@link Marks.OwnerMark} attachment.
  *
  * <p>Cleanup: at the end of the instance every owned entity is discarded (replacements are turned back into the
- * original). Plain spawned entities are never saved to disk, so a chunk unload or a crash simply drops them;
- * replacements are saved with the original's data and restored when loaded without a running owner.
+ * original; a lead on it drops as an item). Plain spawned entities are never saved to disk, so a chunk unload or a
+ * crash simply drops them; replacements are saved with the original's data and restored when loaded without a
+ * running owner.
  *
  * <p>No unowned side spawns: {@link #spawn} adds the entity together with its passengers (a spider jockey's
  * skeleton) and owns all of them; owned zombies never call reinforcements; {@link #spawnMob} runs
@@ -239,7 +241,17 @@ public final class OwnedEntities {
 				return;
 			}
 		}
+		releaseLeashes(entity);
 		entity.discard();
+	}
+
+	/**
+	 * Drops the lead as an item (vanilla {@code dropLeash}) if a player leashed {@code entity} or leashed something to
+	 * it: discarding it would otherwise delete the lead.
+	 */
+	private static void releaseLeashes(Entity entity) {
+		if (entity instanceof Leashable leashable && leashable.isLeashed()) leashable.dropLeash();
+		for (Leashable leashed : Leashable.leashableLeashedTo(entity)) leashed.dropLeash();
 	}
 
 	/** Adds the original back at the replacement's position. False (nothing added) if that failed. */

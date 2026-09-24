@@ -99,7 +99,10 @@ public final class EventManager {
 			OwnedEntities.onEntityLoad(entity, level);
 			TrackedNames.onEntityLoad(entity, level);
 		});
-		ServerLivingEntityEvents.MOB_CONVERSION.register((previous, converted, params) -> OwnedEntities.onConversion(previous, converted));
+		ServerLivingEntityEvents.MOB_CONVERSION.register((previous, converted, params) -> {
+			OwnedEntities.onConversion(previous, converted);
+			TrackedNames.onConversion(previous, converted);
+		});
 		ServerEntityEvents.ENTITY_UNLOAD.register((entity, level) -> with(level.getServer(), m -> m.onUnload(entity)));
 	}
 

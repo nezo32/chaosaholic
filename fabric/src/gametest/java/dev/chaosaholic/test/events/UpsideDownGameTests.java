@@ -22,11 +22,13 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ConversionParams;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.pig.Pig;
 import net.minecraft.world.entity.monster.warden.Warden;
+import net.minecraft.world.entity.monster.zombie.Drowned;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
@@ -175,6 +177,56 @@ public class UpsideDownGameTests {
 				.thenExecute(() -> {
 					h.assertFalse(z.hasAttached(Marks.NAME), "mark removed");
 					z.discard();
+					cleanup(h, p);
+				})
+				.thenSucceed();
+	}
+
+	/**
+	 * Review finding: a flipped zombie that converts (drowning into a drowned) passed the flip name on but not the
+	 * mark, so the drowned stayed Dinnerbone forever. The mark moves along now: the running instance tracks the
+	 * drowned and restores it at the end.
+	 */
+	@GameTest
+	public void convertedMobIsTrackedAndRestored(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 2, 1.5));
+		Zombie z = mob(h, EntityTypes.ZOMBIE, new Vec3(3.5, 2, 1.5));
+		ActiveEvent ev = start(h, "upside_down", p);
+		h.assertTrue(flipped(z), "flipped");
+		Drowned drowned = z.convertTo(EntityTypes.DROWNED, ConversionParams.single(z, true, true), d -> {});
+		h.assertTrue(drowned != null && z.isRemoved(), "converted");
+		h.assertTrue(flipped(drowned), "vanilla copied the flip name");
+		h.assertTrue(drowned.hasAttached(Marks.NAME), "the mark moved along");
+		h.assertTrue(ev.names().tracks(drowned), "tracked by the running instance");
+		h.assertFalse(ev.names().tracks(z), "the old zombie is forgotten");
+		manager(h).stop(ev, StopReason.FORCED);
+		h.assertTrue(drowned.getCustomName() == null, "drowned restored (no name)");
+		h.assertFalse(drowned.hasAttached(Marks.NAME), "mark removed");
+		drowned.discard();
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/** A flipped mob converting while its instance is gone (orphan after a crash) gets its original name back. */
+	@GameTest(maxTicks = 20)
+	public void orphanConversionRestored(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 2, 1.5));
+		Zombie z = mob(h, EntityTypes.ZOMBIE, new Vec3(3.5, 2, 1.5));
+		z.setCustomName(Component.literal("Zed"));
+		ActiveEvent ev = start(h, "upside_down", p);
+		h.assertTrue(flipped(z), "flipped");
+		ev.names().forget(z); // as if the instance vanished in a crash with the mob still flipped
+		manager(h).stop(ev, StopReason.FORCED);
+		Drowned drowned = z.convertTo(EntityTypes.DROWNED, ConversionParams.single(z, true, true), d -> {});
+		h.assertTrue(drowned != null && drowned.hasAttached(Marks.NAME), "converted with the mark");
+		h.startSequence()
+				.thenWaitUntil(() -> h.assertTrue(drowned.getCustomName() != null && "Zed".equals(drowned.getCustomName().getString()),
+						"original name restored on the converted mob"))
+				.thenExecute(() -> {
+					h.assertFalse(drowned.hasAttached(Marks.NAME), "mark removed");
+					drowned.discard();
 					cleanup(h, p);
 				})
 				.thenSucceed();

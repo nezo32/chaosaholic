@@ -73,6 +73,24 @@ public final class TrackedNames {
 		entity.setCustomNameVisible(mark.visible());
 	}
 
+	/**
+	 * ServerLivingEntityEvents.MOB_CONVERSION: vanilla copies the custom name (the flip name) to the converted mob
+	 * (zombie → drowned, a split slime) but not our mark, so the mark moves along: the running owner tracks the new
+	 * mob instead, and without a running owner the original name is put back on the next tick.
+	 */
+	public static void onConversion(Entity previous, Entity converted) {
+		Marks.NameMark mark = previous.getAttached(Marks.NAME);
+		if (mark == null || converted.hasAttached(Marks.NAME)) return;
+		converted.setAttached(Marks.NAME, mark);
+		ActiveEvent live = EventManager.findLive(mark.owner());
+		if (live != null && !live.isStopped()) {
+			live.names().forget(previous);
+			live.names().readopt(converted);
+		} else {
+			EventManager.defer(() -> restore(converted));
+		}
+	}
+
 	/** ServerEntityEvents.ENTITY_LOAD: re-adopt for a running owner, else restore on the next tick. */
 	public static void onEntityLoad(Entity entity, ServerLevel level) {
 		Marks.NameMark mark = entity.getAttached(Marks.NAME);

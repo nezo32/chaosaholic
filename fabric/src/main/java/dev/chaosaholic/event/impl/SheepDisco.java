@@ -30,8 +30,9 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Weird: {@link #MIN_SHEEP}-{@link #MAX_SHEEP} rainbow sheep (named {@value #JEB}, the game's rainbow Easter egg; the
- * name is not shown) appear {@link #MIN_DISTANCE}-{@link #MAX_DISTANCE} blocks around each affected player for 30-45 s,
- * with a looping note-block tune, NOTE particles over every sheep and little dance hops.
+ * name is not always shown, only while a player looks directly at a sheep, like any hidden custom name) appear
+ * {@link #MIN_DISTANCE}-{@link #MAX_DISTANCE} blocks around each affected player for 30-45 s, with a looping
+ * note-block tune, NOTE particles over every sheep and little dance hops.
  *
  * <p>The sheep are owned entities ({@code ev.entities()}): removed at the end (never dropping anything), never saved
  * (chunk unload / crash leave nothing), capped by the owned-entity caps. No farming: they take no damage ({@link #allowDamage}: no

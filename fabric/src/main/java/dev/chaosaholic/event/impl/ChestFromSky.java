@@ -25,13 +25,16 @@ import net.minecraft.world.RandomizableContainer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -50,6 +53,8 @@ public final class ChestFromSky extends ChaosEvent {
 	public static final String ID = "chest_from_sky";
 	public static final int MIN_DISTANCE = 2;
 	public static final int MAX_DISTANCE = 5;
+	/** Eye height of a standing player, for the line-of-sight preference. */
+	private static final double EYE_HEIGHT = 1.62;
 	/** Height of the visual trail above the chest. */
 	public static final int TRAIL_HEIGHT = 8;
 
@@ -99,7 +104,9 @@ public final class ChestFromSky extends ChaosEvent {
 
 	/**
 	 * A spot for the chest {@link #MIN_DISTANCE}-{@link #MAX_DISTANCE} blocks from {@code center}: columns in random
-	 * order when {@code random} is given, a fixed order otherwise (canStart: side-effect free, same answer).
+	 * order when {@code random} is given, a fixed order otherwise (canStart: side-effect free, same answer). In each
+	 * column the height nearest to the player wins ({@link Spots#column}), and a spot the player can see (line of sight
+	 * from the eyes) wins over a hidden one, so indoors the chest lands in the room, not on the roof.
 	 */
 	public static Optional<BlockPos> findSpot(ServerLevel level, BlockPos center, @Nullable RandomSource random) {
 		List<int[]> columns = new ArrayList<>();
@@ -117,13 +124,24 @@ public final class ChestFromSky extends ChaosEvent {
 				columns.set(j, t);
 			}
 		}
+		Vec3 eye = Vec3.atBottomCenterOf(center).add(0.0, EYE_HEIGHT, 0.0);
+		Optional<BlockPos> hidden = Optional.empty();
 		for (int[] c : columns) {
 			Optional<Vec3> feet = Spots.column(level, center.getX() + c[0], center.getY(), center.getZ() + c[1], EntityTypes.PLAYER);
 			if (feet.isEmpty()) continue;
 			BlockPos pos = BlockPos.containing(feet.get());
-			if (canPlace(level, pos)) return Optional.of(pos);
+			if (!canPlace(level, pos)) continue;
+			if (visible(level, eye, pos)) return Optional.of(pos);
+			if (hidden.isEmpty()) hidden = Optional.of(pos);
 		}
-		return Optional.empty();
+		return hidden;
+	}
+
+	/** Nothing solid between the player's eyes and the middle of the chest block. */
+	private static boolean visible(ServerLevel level, Vec3 eye, BlockPos pos) {
+		Vec3 to = Vec3.atCenterOf(pos);
+		return level.clip(new ClipContext(eye, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty()))
+				.getType() == HitResult.Type.MISS;
 	}
 
 	/** Air (nothing is ever replaced), inside the border, and no living entity (a player) standing in the block. */

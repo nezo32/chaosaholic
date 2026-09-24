@@ -10,6 +10,7 @@ import dev.chaosaholic.event.Category;
 import dev.chaosaholic.event.ChaosEvent;
 import dev.chaosaholic.event.EventContext;
 import dev.chaosaholic.event.helper.Area;
+import dev.chaosaholic.event.helper.Spots;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleTypes;
@@ -31,9 +32,12 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Weird (instant): each affected player swaps places with a random mob within {@link #RADIUS} blocks. Only "fair
  * game" mobs are picked (a {@link Mob}, so no armor stands, and Area#isFairGame: no bosses, pets, named mobs, riders
- * or entities of other events), and only when both destinations are safe ({@link #fits}): the player's current box fits at the mob's spot and the mob's box
- * at the player's, both loaded, inside the world border, standing on a block, free of blocks, liquids and hazards
- * (fire, lava, magma, cactus, berry bush, powder snow, campfire, wither rose). No such mob: {@link #canStart} is false.
+ * or entities of other events), and only when both destinations are safe ({@link #fits}): the player's current box
+ * fits at the mob's spot and the mob's box at the player's, both loaded, inside the world border, standing on a
+ * block, free of blocks, liquids and hazards (fire, lava, magma, cactus, berry bush, powder snow, campfire, wither
+ * rose). The player must also see the mob (line of sight, eyes to eyes) or the mob must stand in open space
+ * ({@link Spots#isOpen}), so a player is never swapped into a sealed pocket inside rock. No such mob:
+ * {@link #canStart} is false.
  *
  * <p>Both keep their own rotation; velocity and fall distance of both are reset, so the swap can neither hurt nor
  * save anyone from a fall. A player riding something is not swapped. Nothing to clean up: the positions are the effect.
@@ -75,12 +79,13 @@ public final class Swap extends ChaosEvent {
 				mob -> mob instanceof Mob && Area.isFairGame(mob) && canSwap(level, player, mob));
 	}
 
-	/** Both boxes fit at the other's position. */
+	/** Both boxes fit at the other's position, and the player sees the mob or the mob stands in open space. */
 	public static boolean canSwap(ServerLevel level, ServerPlayer player, LivingEntity mob) {
 		Vec3 p = player.position();
 		Vec3 m = mob.position();
 		return fits(level, player, player.getBoundingBox().move(m.subtract(p)))
-				&& fits(level, mob, mob.getBoundingBox().move(p.subtract(m)));
+				&& fits(level, mob, mob.getBoundingBox().move(p.subtract(m)))
+				&& (player.hasLineOfSight(mob) || Spots.isOpen(level, mob.blockPosition()));
 	}
 
 	/** Swaps the two positions (rotations kept). False (and nothing moved) if it is not safe any more. */

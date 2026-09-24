@@ -20,7 +20,8 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
  * (singleplayer menu), like the server's boss bar.
  */
 public final class ClientEventState {
-	private record Timer(int remaining, int total) {}
+	/** {@code elapsed}: ticks counted here since the id appeared; unlike total - remaining it never jumps on extension. */
+	private record Timer(int remaining, int total, int elapsed) {}
 
 	private static final Map<String, Timer> ACTIVE = new LinkedHashMap<>();
 
@@ -35,15 +36,24 @@ public final class ClientEventState {
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ACTIVE.clear());
 	}
 
-	/** Replaces the whole state (a payload always carries the complete list). */
+	/**
+	 * Replaces the whole state (a payload always carries the complete list). An id that stays active keeps its local
+	 * elapsed counter (an extension raises remaining and total, the effect runs on smoothly); a new id starts at
+	 * total - remaining (joined mid-run, e.g. after a relog).
+	 */
 	public static void set(List<ActiveEventsPayload.Entry> entries) {
+		Map<String, Timer> before = new LinkedHashMap<>(ACTIVE);
 		ACTIVE.clear();
-		for (ActiveEventsPayload.Entry e : entries) ACTIVE.put(e.id(), new Timer(e.remaining(), e.total()));
+		for (ActiveEventsPayload.Entry e : entries) {
+			Timer old = before.get(e.id());
+			int elapsed = old != null ? old.elapsed() : Math.max(0, e.total() - e.remaining());
+			ACTIVE.put(e.id(), new Timer(e.remaining(), e.total(), elapsed));
+		}
 	}
 
 	private static void tick() {
 		if (ACTIVE.isEmpty()) return;
-		ACTIVE.replaceAll((id, t) -> new Timer(Math.max(0, t.remaining() - 1), t.total()));
+		ACTIVE.replaceAll((id, t) -> new Timer(Math.max(0, t.remaining() - 1), t.total(), t.elapsed() + 1));
 		ACTIVE.values().removeIf(t -> t.remaining() <= 0);
 	}
 
@@ -64,6 +74,15 @@ public final class ClientEventState {
 	public static int remainingTicks(String id) {
 		Timer t = ACTIVE.get(id);
 		return t == null ? 0 : t.remaining();
+	}
+
+	/**
+	 * Ticks the event has been running for the local player, counted locally (paused with the game) and continued
+	 * across extensions (0 if not active).
+	 */
+	public static int elapsedTicks(String id) {
+		Timer t = ACTIVE.get(id);
+		return t == null ? 0 : t.elapsed();
 	}
 
 	public static int totalTicks(String id) {

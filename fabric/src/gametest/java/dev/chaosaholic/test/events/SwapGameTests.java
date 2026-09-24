@@ -10,6 +10,7 @@ import static dev.chaosaholic.test.TestSupport.survivalPlayer;
 
 import java.util.List;
 
+import dev.chaosaholic.event.helper.Spots;
 import dev.chaosaholic.event.impl.Swap;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
@@ -125,6 +126,48 @@ public class SwapGameTests {
 		h.assertTrue(Swap.candidates(h.getLevel(), p).isEmpty(), "no candidate while the player floats");
 		h.assertTrue(manager(h).trigger(event("swap"), p).isEmpty(), "refused");
 		h.assertTrue(near(p.position(), playerBefore) && near(z.position(), mobBefore), "nothing moved");
+		z.discard();
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/**
+	 * A zombie sealed in a 1x2 pocket inside stone is never a candidate (the player would be walled in); once the
+	 * pocket is open and the player sees it, it is.
+	 */
+	@GameTest
+	public void neverIntoASealedPocket(GameTestHelper h) {
+		defaults(h);
+		floor(h);
+		for (int x = 4; x <= 6; x++) for (int z = 4; z <= 6; z++) for (int y = 2; y <= 4; y++) h.setBlock(new BlockPos(x, y, z), Blocks.STONE);
+		h.setBlock(new BlockPos(5, 2, 5), Blocks.AIR);
+		h.setBlock(new BlockPos(5, 3, 5), Blocks.AIR);
+		ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 2, 1.5));
+		Zombie z = mob(h, EntityTypes.ZOMBIE, new Vec3(5.5, 2, 5.5));
+		h.assertFalse(Spots.isOpen(h.getLevel(), z.blockPosition()), "sealed pocket");
+		h.assertFalse(p.hasLineOfSight(z), "not visible");
+		h.assertFalse(Swap.candidates(h.getLevel(), p).contains(z), "sealed zombie is no candidate");
+		h.assertTrue(manager(h).trigger(event("swap"), p).isEmpty(), "refused");
+		for (int x = 4; x <= 6; x++) for (int z2 = 4; z2 <= 6; z2++) for (int y = 2; y <= 4; y++) {
+			if (x != 5 || z2 != 5 || y == 4) h.setBlock(new BlockPos(x, y, z2), Blocks.AIR);
+		}
+		h.assertTrue(Swap.candidates(h.getLevel(), p).contains(z), "open again: candidate");
+		z.discard();
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/** A mob behind a wall the player cannot see through still counts when it stands in open space. */
+	@GameTest
+	public void hiddenMobInOpenSpaceStillCounts(GameTestHelper h) {
+		defaults(h);
+		floor(h);
+		for (int z = 0; z < 8; z++) for (int y = 2; y <= 4; y++) h.setBlock(new BlockPos(3, y, z), Blocks.STONE);
+		ServerPlayer p = survivalPlayer(h, new Vec3(1.5, 2, 1.5));
+		Zombie z = mob(h, EntityTypes.ZOMBIE, new Vec3(5.5, 2, 5.5));
+		h.assertFalse(p.hasLineOfSight(z), "behind the wall");
+		h.assertTrue(Spots.isOpen(h.getLevel(), z.blockPosition()), "open space");
+		h.assertTrue(Swap.candidates(h.getLevel(), p).contains(z), "candidate");
 		z.discard();
 		cleanup(h, p);
 		h.succeed();
