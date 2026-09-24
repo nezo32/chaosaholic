@@ -1,22 +1,48 @@
 package dev.chaosaholic.event.impl;
 
+import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.Category;
 import dev.chaosaholic.event.ChaosEvent;
-import dev.chaosaholic.event.EventContext;
+import net.minecraft.core.Holder;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.effect.MobEffects;
 
 /**
- * Bad: Darkness closes in for a few seconds.
- *
- * <p>NOT IMPLEMENTED YET: {@link #canStart} returns false, so the event is never rolled and /chaosaholic trigger
- * refuses it. Implement it following ARCHITECTURE.md ("Event authoring guide"), then remove that override.
+ * Bad: Darkness (not Blindness: pulsing, less nauseating, presentation.md §5) for 5-10 s through the effect tracker.
+ * Not a hazard, so no warning. Extensions never push the remaining time past {@link #MAX_TICKS}, so a blackout stays
+ * short however often it is rolled.
  */
 public final class Blackout extends ChaosEvent {
+	/** Longest remaining time, also after extensions (10 s). */
+	public static final int MAX_TICKS = 10 * 20;
+
 	public Blackout() {
 		super("blackout", Category.BAD, 5, 10);
 	}
 
 	@Override
-	public boolean canStart(EventContext ctx) {
-		return false; // TODO(blackout): not implemented yet
+	public void onPlayerAdded(ActiveEvent ev, ServerPlayer player) {
+		ev.effects().give(player, MobEffects.DARKNESS, 0);
+		ev.level().sendParticles(ParticleTypes.SQUID_INK, player.getX(), player.getY() + 1, player.getZ(), 16, 0.6, 0.6, 0.6, 0.05);
+	}
+
+	@Override
+	public void onExtended(ActiveEvent ev, int addedTicks) {
+		// an effect already given for longer is still ours at the end (never longer than what the tracker gave)
+		if (ev.remainingTicks() > MAX_TICKS) ev.setRemainingTicks(MAX_TICKS);
+	}
+
+	@Override
+	public Holder<SoundEvent> startSound() {
+		return BuiltInRegistries.SOUND_EVENT.wrapAsHolder(SoundEvents.WARDEN_HEARTBEAT);
+	}
+
+	@Override
+	public float startSoundVolume() {
+		return 0.6F;
 	}
 }
