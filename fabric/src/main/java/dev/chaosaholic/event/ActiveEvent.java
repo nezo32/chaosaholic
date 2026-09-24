@@ -16,7 +16,6 @@ import dev.chaosaholic.event.helper.TempBlocks;
 import dev.chaosaholic.event.helper.TrackedEffects;
 import dev.chaosaholic.event.helper.TrackedModifiers;
 import dev.chaosaholic.event.helper.TrackedNames;
-import net.minecraft.server.bossevents.CustomBossEvent;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -224,10 +223,5 @@ public final class ActiveEvent {
 	@Override
 	public String toString() {
 		return "ActiveEvent[" + event.id() + " " + uuid + " remaining=" + remaining + " players=" + players.size() + "]";
-	}
-
-	// unused import guard for CustomBossEvent (vanilla /bossbar bars are never touched)
-	static boolean isVanillaBar(ServerBossEvent bar) {
-		return bar instanceof CustomBossEvent;
 	}
 }
