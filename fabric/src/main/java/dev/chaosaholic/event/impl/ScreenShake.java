@@ -13,9 +13,10 @@ import net.minecraft.sounds.SoundEvents;
 /**
  * Weird: the camera wobbles for 10-15 s. The wobble itself is client-side (GameRendererMixin + core.ShakeCurve:
  * ≤ 1.5°, ~8 Hz, eased in over 0.5 s and out over the last 1 s) and reads the synced active-events list, so it
- * follows this instance's timer, extensions and every removal path without server code. Players who switched
- * Screen effects off, and players without the mod, only get the boss bar, the sound and the particles. Nothing to
- * clean up on the server.
+ * follows this instance's timer, extensions (smoothly: the phase runs on a client-side elapsed counter) and every
+ * removal path without server code. The angles are scaled by the vanilla Screen Effects accessibility slider. Players
+ * who switched Screen effects off (Chaosaholic setting or the slider at 0 %), and players without the mod, only get
+ * the boss bar, the sound and the particles. Nothing to clean up on the server.
  */
 public final class ScreenShake extends ChaosEvent {
 	public static final String ID = "screen_shake";

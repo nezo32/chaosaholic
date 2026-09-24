@@ -9,6 +9,7 @@ import dev.chaosaholic.event.Category;
 import dev.chaosaholic.event.ChaosEvent;
 import dev.chaosaholic.event.helper.Sounds;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -18,21 +19,27 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Bad: for 30-45 s, every {@link #CHECK_TICKS} ticks (first check after {@link #GRACE_TICKS}) each affected player
  * has a {@link #CHANCE_PERCENT} % chance to drop the whole main-hand stack, at most {@link #MAX_DROPS} times per
  * player and run. The stack is tossed like Q (a normal item entity, thrower = the player, pickup delay
- * {@link #PICKUP_DELAY_TICKS}): about a block forward, or straight down at the feet if the spot ahead has lava,
- * fire, a campfire or cactus, or no floor within 3 blocks. Never while the player is airborne or in lava (the item
- * could be lost). Nothing is destroyed and nothing needs cleanup: the dropped items are the player's own and stay in
- * the world like any drop. No hazard, so no warning.
+ * {@link #PICKUP_DELAY_TICKS}) about 1.7 blocks forward, but only if every block it can fly over or slide onto
+ * within {@link #FLIGHT_REACH} blocks (the item's width included, up to a wall) has a floor at most
+ * {@link #MAX_FALL} blocks down and no lava, fire, campfire or cactus. Otherwise it is set down without speed on top
+ * of the block the player stands on (the solid part under the player, never the air of an overhang); if that is not
+ * safe either, nothing is dropped this time. Never while the player is airborne or in lava. So the item is never
+ * destroyed (lava, fire, the void) and nothing needs cleanup: the dropped items are the player's own and stay in the
+ * world like any drop. No hazard, so no warning.
  */
 public final class Butterfingers extends ChaosEvent {
 	public static final int CHECK_TICKS = 100;
@@ -43,8 +50,19 @@ public final class Butterfingers extends ChaosEvent {
 	public static final int MAX_DROPS = 4;
 	/** Shorter than a Q toss (40): the player can grab it back quickly. */
 	public static final int PICKUP_DELAY_TICKS = 20;
-	/** Horizontal toss speed (blocks per tick); lands about a block ahead. */
-	public static final double TOSS_SPEED = 0.2;
+	/** Horizontal toss speed (blocks per tick); on level ground the item lands about 1.7 blocks ahead. */
+	public static final double TOSS_SPEED = 0.15;
+	/**
+	 * How far ahead the flight is checked: the landing point on level ground plus a drop of {@link #MAX_FALL} blocks
+	 * (about 2.4) and the slide after landing, with margin.
+	 */
+	public static final double FLIGHT_REACH = 3.0;
+	/** Sampling step along the flight. */
+	private static final double FLIGHT_STEP = 0.25;
+	/** Half the width of an item entity, plus margin. */
+	private static final double ITEM_HALF_WIDTH = 0.15;
+	/** Deepest drop an item may fall to its landing (blocks below the player's feet). */
+	public static final int MAX_FALL = 3;
 
 	private static final class State {
 		final Map<UUID, Integer> drops = new HashMap<>();
@@ -69,7 +87,8 @@ public final class Butterfingers extends ChaosEvent {
 
 	/**
 	 * One drop check for an affected player: drops the main-hand stack if {@code lucky}, the player holds something,
-	 * stands on the ground, is not in lava, and has drops left. Returns true if the stack was dropped.
+	 * stands on the ground, is not in lava, has drops left and there is a safe place for the item ({@link #plan}).
+	 * Returns true if the stack was dropped.
 	 */
 	public static boolean attempt(ActiveEvent ev, ServerPlayer player, boolean lucky) {
 		if (!lucky || !ev.isAffected(player)) return false;
@@ -77,7 +96,9 @@ public final class Butterfingers extends ChaosEvent {
 		int done = s.drops.getOrDefault(player.getUUID(), 0);
 		if (done >= MAX_DROPS) return false;
 		if (player.getMainHandItem().isEmpty() || !player.onGround() || player.isInLava()) return false;
-		drop(ev.level(), player);
+		Toss toss = plan(ev.level(), player);
+		if (toss == null) return false;
+		drop(ev.level(), player, toss);
 		s.drops.put(player.getUUID(), done + 1);
 		return true;
 	}
@@ -87,38 +108,128 @@ public final class Butterfingers extends ChaosEvent {
 		return MAX_DROPS - ev.state(State::new).drops.getOrDefault(player.getUUID(), 0);
 	}
 
-	private static void drop(ServerLevel level, ServerPlayer player) {
-		ItemStack held = player.getMainHandItem();
-		player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+	/** Where the item starts and how it moves. */
+	public record Toss(Vec3 from, Vec3 velocity) {}
+
+	/**
+	 * How the stack would leave {@code player}'s hand: tossed forward when every block along the flight
+	 * ({@link #FLIGHT_REACH} blocks ahead, the item's width included) is safe ({@link #safeColumn}), else set down
+	 * without speed right above the block the player stands on (the part under the player, not the air of an
+	 * overhang); null when neither is safe (then nothing is dropped).
+	 */
+	public static @Nullable Toss plan(ServerLevel level, ServerPlayer player) {
 		Vec3 look = player.getLookAngle();
 		Vec3 flat = new Vec3(look.x, 0.0, look.z);
-		flat = flat.lengthSqr() < 1.0E-4 ? Vec3.ZERO : flat.normalize();
-		boolean forward = flat != Vec3.ZERO && safeLanding(level, BlockPos.containing(player.position().add(flat.scale(1.2))));
-		Vec3 velocity = forward ? flat.scale(TOSS_SPEED).add(0.0, 0.15, 0.0) : new Vec3(0.0, 0.1, 0.0);
+		if (flat.lengthSqr() > 1.0E-4 && safeFlight(level, player, flat.normalize())) {
+			Vec3 from = new Vec3(player.getX(), player.getEyeY() - 0.3, player.getZ());
+			return new Toss(from, flat.normalize().scale(TOSS_SPEED).add(0.0, 0.15, 0.0));
+		}
+		Vec3 feet = setDown(level, player);
+		return feet == null ? null : new Toss(feet, Vec3.ZERO);
+	}
+
+	private static void drop(ServerLevel level, ServerPlayer player, Toss toss) {
+		ItemStack held = player.getMainHandItem();
+		player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
 		// not Player#drop: its signature differs between 26.2 and 26.3
-		ItemEntity item = new ItemEntity(level, player.getX(), player.getEyeY() - 0.3, player.getZ(), held);
+		ItemEntity item = new ItemEntity(level, toss.from().x, toss.from().y, toss.from().z, held);
 		item.setPickUpDelay(PICKUP_DELAY_TICKS);
 		item.setThrower(player);
-		item.setDeltaMovement(velocity);
+		item.setDeltaMovement(toss.velocity());
 		level.addFreshEntity(item);
 		player.containerMenu.broadcastChanges();
 		Sounds.play(player, SoundEvents.ITEM_PICKUP, 0.6F, 0.6F);
 	}
 
-	/** Landing spot ahead: passable, a floor within 3 blocks below and no lava / fire / campfire / cactus down to that floor. */
-	private static boolean safeLanding(ServerLevel level, BlockPos feet) {
-		boolean floor = false;
-		for (int i = 0; i <= 3; i++) {
-			BlockPos pos = feet.below(i);
+	/**
+	 * Every column the tossed item can fly over or slide onto is safe: sampled every {@link #FLIGHT_STEP} blocks up to
+	 * {@link #FLIGHT_REACH} ahead, and {@link #ITEM_HALF_WIDTH} to each side. The flight ends early (safe so far) at a
+	 * block in the way at flight height (0.6-1.9 above the feet): the item bounces off and falls in front of it.
+	 */
+	private static boolean safeFlight(ServerLevel level, ServerPlayer player, Vec3 dir) {
+		Vec3 side = new Vec3(-dir.z, 0.0, dir.x).scale(ITEM_HALF_WIDTH);
+		double y = player.getY();
+		if (!level.noCollision(flightBox(player.position(), y))) return false; // no room to throw (low ceiling)
+		for (double d = FLIGHT_STEP; d <= FLIGHT_REACH + 1.0E-6; d += FLIGHT_STEP) {
+			Vec3 at = player.position().add(dir.scale(d));
+			boolean wall = false;
+			for (int k = -1; k <= 1; k++) {
+				Vec3 p = at.add(side.scale(k));
+				if (!level.noCollision(flightBox(p, y))) {
+					wall = true;
+				} else if (!safeColumn(level, BlockPos.containing(p.x, y + 0.5, p.z))) {
+					return false;
+				}
+			}
+			if (wall) return true;
+		}
+		return true;
+	}
+
+	/**
+	 * An item falling down column {@code top} lands safely: a floor (any collision) at most {@link #MAX_FALL} blocks
+	 * below and nothing that destroys items (lava, fire, campfire, cactus) from the flight height down to that floor.
+	 */
+	private static boolean safeColumn(ServerLevel level, BlockPos top) {
+		if (destroysItems(level.getBlockState(top.above()))) return false;
+		for (int i = 0; i <= MAX_FALL; i++) {
+			BlockPos pos = top.below(i);
+			if (pos.getY() < level.getMinY()) return false; // the void
 			BlockState state = level.getBlockState(pos);
 			if (destroysItems(state)) return false;
-			if (i > 0 && !state.getCollisionShape(level, pos).isEmpty()) {
-				floor = true;
-				break;
+			if (!state.getCollisionShape(level, pos).isEmpty()) return true; // the floor
+		}
+		return false;
+	}
+
+	/** The space the item flies through above point {@code p} (0.6-1.9 above the feet height {@code y}). */
+	private static AABB flightBox(Vec3 p, double y) {
+		return new AABB(p.x - ITEM_HALF_WIDTH, y + 0.6, p.z - ITEM_HALF_WIDTH, p.x + ITEM_HALF_WIDTH, y + 1.9, p.z + ITEM_HALF_WIDTH);
+	}
+
+	private static boolean blocks(ServerLevel level, BlockPos pos) {
+		return !level.getBlockState(pos).getCollisionShape(level, pos).isEmpty();
+	}
+
+	/**
+	 * Just above the block the player stands on, inside that block's top face (so the item cannot roll over an edge),
+	 * or null if that block is not a sturdy, harmless top or the spot is not free.
+	 */
+	private static @Nullable Vec3 setDown(ServerLevel level, ServerPlayer player) {
+		BlockPos support = supportingBlock(level, player);
+		if (support == null) return null;
+		double x = Mth.clamp(player.getX(), support.getX() + ITEM_HALF_WIDTH, support.getX() + 1.0 - ITEM_HALF_WIDTH);
+		double z = Mth.clamp(player.getZ(), support.getZ() + ITEM_HALF_WIDTH, support.getZ() + 1.0 - ITEM_HALF_WIDTH);
+		BlockPos above = support.above();
+		if (blocks(level, above) || destroysItems(level.getBlockState(above))) return null;
+		return new Vec3(x, above.getY() + 0.05, z);
+	}
+
+	/**
+	 * The block right under the player's feet that carries them: a sturdy top face, not harmful to items, nearest to
+	 * the player's centre among the blocks under their box (the edge block when the player leans over an overhang).
+	 */
+	private static @Nullable BlockPos supportingBlock(ServerLevel level, ServerPlayer player) {
+		AABB box = player.getBoundingBox();
+		int y = Mth.floor(player.getY() - 1.0E-3);
+		if (Math.abs(player.getY() - (y + 1)) > 1.0E-3) return null; // not standing on a full block top (slab, path, ...)
+		BlockPos best = null;
+		double bestDist = Double.MAX_VALUE;
+		for (int x = Mth.floor(box.minX); x <= Mth.floor(box.maxX - 1.0E-7); x++) {
+			for (int z = Mth.floor(box.minZ); z <= Mth.floor(box.maxZ - 1.0E-7); z++) {
+				BlockPos pos = new BlockPos(x, y, z);
+				BlockState state = level.getBlockState(pos);
+				if (!state.isFaceSturdy(level, pos, Direction.UP) || destroysItems(state)) continue;
+				double dx = x + 0.5 - player.getX();
+				double dz = z + 0.5 - player.getZ();
+				double dist = dx * dx + dz * dz;
+				if (dist < bestDist) {
+					bestDist = dist;
+					best = pos;
+				}
 			}
 		}
-		// the block at the feet itself must be passable, otherwise the item bounces off a wall
-		return floor && level.getBlockState(feet).getCollisionShape(level, feet).isEmpty();
+		return best;
 	}
 
 	/** Blocks that burn or break an item entity touching them. */

@@ -3,7 +3,9 @@ package dev.chaosaholic.core;
 /**
  * Camera wobble of the screen_shake event (client side, design/presentation.md §5): smooth sine oscillation of about
  * {@link #FREQUENCY_HZ} Hz, at most {@link #MAX_DEGREES} degrees on every axis, eased in over {@link #EASE_IN_TICKS}
- * and out over the last {@link #EASE_OUT_TICKS}. Pure math: the client feeds it the synced timer, the renderer
+ * and out over the last {@link #EASE_OUT_TICKS}. Pure math: the client feeds it the elapsed ticks it counts itself
+ * (continuous across extensions) and the synced remaining time, and scales the result by its Screen Effects option
+ * ({@link #scale}); the renderer
  * applies the angles to the camera pose (never to the player's real rotation). No flashing: only rotation, and
  * continuous in time.
  */
@@ -53,6 +55,16 @@ public final class ShakeCurve {
 		double pitch = a * 0.6 * Math.sin(w * 0.84 * t + 0.7);
 		double roll = a * 0.8 * Math.sin(w * 0.97 * t + 2.1);
 		return new Angles(clamp(pitch), clamp(yaw), clamp(roll));
+	}
+
+	/**
+	 * {@code angles} scaled by {@code factor}, clamped to 0..1 (the client's Screen Effects accessibility option):
+	 * 0 or an invalid factor (NaN) turns the shake off, 1 leaves it unchanged.
+	 */
+	public static Angles scale(Angles angles, float factor) {
+		if (!(factor > 0.0F)) return Angles.NONE; // also catches NaN
+		if (factor >= 1.0F) return angles;
+		return new Angles(angles.pitch() * factor, angles.yaw() * factor, angles.roll() * factor);
 	}
 
 	private static float smooth(float x) {

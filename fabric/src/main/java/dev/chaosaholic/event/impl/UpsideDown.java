@@ -1,12 +1,8 @@
 package dev.chaosaholic.event.impl;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.Category;
 import dev.chaosaholic.event.ChaosEvent;
-import dev.chaosaholic.event.StopReason;
 import dev.chaosaholic.event.helper.Area;
 import dev.chaosaholic.event.helper.Marks;
 import net.minecraft.core.Holder;
@@ -32,12 +28,14 @@ import org.jspecify.annotations.Nullable;
  * scanned again every {@link #RESCAN_TICKS} ticks, so mobs that walk in later flip as well.
  *
  * <p>Names go through {@code ev.names()} (TrackedNames): the original custom name (or none) and its visibility are
- * kept in a persistent attachment and restored at the end, after a chunk reload and after a crash. The flip name is
- * never shown: it is only visible if the mob's own name already was. Players are never renamed (the renderer flips
- * players only by their account name). Named and tamed mobs flip too (the change is purely cosmetic and always
- * restored); bosses, entities of other events (owned or renamed) and mobs already called Dinnerbone/Grumm do not.
- * A mob a player renames with a name tag during the event keeps that new name at the end. The names belong to the
- * mobs, not to a player: a player leaving early changes nothing, they are restored when the instance ends.
+ * kept in a persistent attachment and restored at the end, after a chunk reload and after a crash; a flipped mob that
+ * converts (zombie drowning into a drowned) hands the mark to what it became. The flip name is not shown above the
+ * mob: it keeps the visibility of the mob's own name, so like any hidden custom name it only appears while a player
+ * looks directly at the mob. Players are never renamed (the renderer flips players only by their account name). Named
+ * and tamed mobs flip too (the change is purely cosmetic and always restored); bosses, entities of other events (owned
+ * or renamed) and mobs already called Dinnerbone/Grumm do not. A mob a player renames with a name tag during the event
+ * keeps that new name at the end (TrackedNames only restores a mob that still carries the flip name). The names belong
+ * to the mobs, not to a player: a player leaving early changes nothing, they are restored when the instance ends.
  */
 public final class UpsideDown extends ChaosEvent {
 	/** Game Easter egg name (the client renders entities with this name upside down), not player text. */
@@ -51,9 +49,9 @@ public final class UpsideDown extends ChaosEvent {
 	/** Rescan period for newcomers (area scans at most once a second). */
 	public static final int RESCAN_TICKS = 20;
 
-	/** Mobs this instance flipped (only for the cap and the name-tag check at the end; always checked for removal). */
+	/** Number of mobs this instance flipped (the cap). */
 	private static final class State {
-		final List<Entity> flipped = new ArrayList<>();
+		int flipped;
 	}
 
 	public UpsideDown() {
@@ -71,30 +69,19 @@ public final class UpsideDown extends ChaosEvent {
 		for (ServerPlayer p : ev.players()) flipAround(ev, p);
 	}
 
-	@Override
-	public void onStop(ActiveEvent ev, StopReason reason) {
-		// Runs before the framework restores the names: a mob that got a new name from a player (name tag) during
-		// the event keeps it instead of getting its old name back.
-		for (Entity e : ev.state(State::new).flipped) {
-			if (e.isRemoved() || !ev.names().tracks(e) || isFlipName(e.getCustomName())) continue;
-			ev.names().forget(e);
-			e.removeAttached(Marks.NAME);
-		}
-	}
-
 	/**
 	 * Flips every eligible mob around {@code player} that is not flipped yet, within the instance cap. Returns the
 	 * number of mobs flipped by this call.
 	 */
 	public static int flipAround(ActiveEvent ev, ServerPlayer player) {
 		State s = ev.state(State::new);
-		if (s.flipped.size() >= MAX_FLIPPED) return 0;
+		if (s.flipped >= MAX_FLIPPED) return 0;
 		ServerLevel level = ev.level();
 		int n = 0;
 		for (LivingEntity mob : Area.entities(level, player.position(), RADIUS, LivingEntity.class, UpsideDown::canFlip)) {
-			if (s.flipped.size() >= MAX_FLIPPED) break;
+			if (s.flipped >= MAX_FLIPPED) break;
 			if (!ev.names().rename(mob, Component.literal(DINNERBONE), mob.isCustomNameVisible())) continue;
-			s.flipped.add(mob);
+			s.flipped++;
 			n++;
 			level.sendParticles(ParticleTypes.WITCH, mob.getX(), mob.getY() + mob.getBbHeight() + 0.2, mob.getZ(), 6, 0.3, 0.2, 0.3, 0.02);
 		}

@@ -133,7 +133,7 @@ Durations are random within the range. An event never has more than 180 s left, 
 | Sheep Disco | 3–5 rainbow sheep appear and dance to a tune | 30–45 s | They can't be hurt, sheared or bred (no free wool farm), and leave at the end |
 | Slippery | Every block feels like ice | 30–45 s | Ends with the event |
 | Random Teleport | You teleport to a random safe spot 8–24 blocks away | instant | Only onto a safe, solid spot. No fall damage |
-| Screen Shake | Your camera wobbles | 10–15 s | Needs the mod on your client. Off if you disabled screen effects |
+| Screen Shake | Your camera wobbles | 10–15 s | Needs the mod on your client. Off if you disabled screen effects; follows the Screen Effects slider |
 | Glow Party | Everything within 16 blocks glows, even through walls | 30–60 s | At most 48 entities |
 
 ## Install
@@ -156,7 +156,8 @@ shake; players without it can still join and play.
 - Eternal Night changes the time for the whole dimension, not just for you, and nobody can sleep it away.
 - Screen Shake is invisible without the mod on your client (or with screen effects off): you just get the boss bar
   and the sound.
-- Upside Down renames mobs to Dinnerbone for a while; pets and name-tagged mobs get their names back at the end.
+- Upside Down renames mobs to Dinnerbone for a while (the name shows when you look straight at a mob); pets and
+  name-tagged mobs get their names back at the end.
 - Chickenpocalypse is permanent for a chicken that dies: the original mob is gone with it.
 - Tiny World shrinks your reach and step height along with you (that's vanilla's scale attribute).
 - TNT Rain follows the `mob_griefing` game rule: with it on, the TNT breaks blocks like normal TNT.

@@ -65,4 +65,31 @@ class ShakeCurveTest {
 			last = a;
 		}
 	}
+
+	/**
+	 * An extension raises the remaining time; the client keeps counting elapsed ticks, so the angles in the middle of
+	 * the run are exactly the same (no jump). Deriving elapsed from total - remaining instead would jump.
+	 */
+	@Test
+	void extensionDoesNotJump() {
+		float elapsed = 100.25F;
+		ShakeCurve.Angles before = ShakeCurve.angles(elapsed, 150.0F);
+		ShakeCurve.Angles after = ShakeCurve.angles(elapsed, 150.0F + 200.0F);
+		assertEquals(before, after, "same phase and strength after the extension");
+		ShakeCurve.Angles next = ShakeCurve.angles(elapsed + 1.0F / 6.0F, 350.0F - 1.0F / 6.0F);
+		assertTrue(Math.abs(next.yaw() - after.yaw()) < 0.6F, "continuous on the next frame");
+	}
+
+	@Test
+	void scaledByScreenEffectsOption() {
+		ShakeCurve.Angles a = ShakeCurve.angles(60.0F, 100.0F);
+		assertEquals(a, ShakeCurve.scale(a, 1.0F), "100 %: unchanged");
+		assertEquals(a, ShakeCurve.scale(a, 3.0F), "never above 100 %");
+		assertTrue(ShakeCurve.scale(a, 0.0F).isNone(), "0 %: off");
+		assertTrue(ShakeCurve.scale(a, Float.NaN).isNone(), "NaN: off");
+		ShakeCurve.Angles half = ShakeCurve.scale(a, 0.5F);
+		assertEquals(a.yaw() * 0.5F, half.yaw(), 1.0E-6F);
+		assertEquals(a.pitch() * 0.5F, half.pitch(), 1.0E-6F);
+		assertEquals(a.roll() * 0.5F, half.roll(), 1.0E-6F);
+	}
 }

@@ -71,7 +71,7 @@ public class SheepDiscoGameTests {
 		ServerPlayer p = player(h);
 		ActiveEvent ev = start(h, "sheep_disco", p);
 		List<Sheep> sheep = sheep(ev);
-		h.assertTrue(sheep.size() >= 1 && sheep.size() <= SheepDisco.MAX_SHEEP, "1-5 sheep: " + sheep.size());
+		h.assertTrue(sheep.size() >= SheepDisco.MIN_SHEEP && sheep.size() <= SheepDisco.MAX_SHEEP, "3-5 sheep: " + sheep.size());
 		for (Sheep s : sheep) {
 			h.assertValueEqual(s.getCustomName().getString(), SheepDisco.JEB, "jeb_");
 			h.assertFalse(s.isCustomNameVisible(), "name hidden");
@@ -95,7 +95,7 @@ public class SheepDiscoGameTests {
 		ServerPlayer p = player(h);
 		ActiveEvent ev = start(h, "sheep_disco", p);
 		List<Sheep> sheep = sheep(ev);
-		h.assertFalse(sheep.isEmpty(), "sheep");
+		h.assertTrue(sheep.size() >= SheepDisco.MIN_SHEEP, "at least 3 sheep: " + sheep.size());
 		ev.setRemainingTicks(30);
 		h.startSequence()
 				.thenWaitUntil(() -> h.assertTrue(ev.isStopped(), "ended"))
@@ -105,6 +105,29 @@ public class SheepDiscoGameTests {
 					cleanup(h, p);
 				})
 				.thenSucceed();
+	}
+
+	/**
+	 * A lead a player put on a disco sheep is not lost when the sheep leaves at the end: OwnedEntities drops it as an
+	 * item before discarding the sheep.
+	 */
+	@GameTest
+	public void leadOnASheepDropsAtTheEnd(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = player(h);
+		ActiveEvent ev = start(h, "sheep_disco", p);
+		Sheep leashed = sheep(ev).getFirst();
+		leashed.setLeashedTo(p, true);
+		h.assertTrue(leashed.isLeashed(), "leashed");
+		Vec3 at = leashed.position();
+		manager(h).stop(ev, StopReason.FORCED);
+		h.assertTrue(leashed.isRemoved(), "sheep removed");
+		List<ItemEntity> leads = h.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(at, at).inflate(2.0), i -> i.getItem().is(Items.LEAD));
+		h.assertValueEqual(leads.size(), 1, "the lead dropped as an item");
+		leads.forEach(ItemEntity::discard);
+		assertNoFarmDrops(h);
+		cleanup(h, p);
+		h.succeed();
 	}
 
 	@GameTest(maxTicks = 40)

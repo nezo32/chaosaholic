@@ -11,8 +11,10 @@ import static dev.chaosaholic.test.TestSupport.survivalPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import dev.chaosaholic.event.ActiveEvent;
+import dev.chaosaholic.event.helper.Spots;
 import dev.chaosaholic.event.impl.ChestFromSky;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
@@ -84,6 +86,46 @@ public class ChestFromSkyGameTests {
 		}
 		h.assertTrue(manager(h).activeFor(p).isEmpty(), "nothing running");
 		for (BlockPos pos : chests) level.removeBlock(pos, false); // the chest is permanent: the test cleans its own
+		cleanup(h, p);
+		h.succeed();
+	}
+
+	/**
+	 * Review finding: indoors the chest used to land on the roof (Spots scanned the column top-down). A closed stone
+	 * room (floor y = 1, walls, ceiling y = 4): the spot is always in the room at the player's height, which the
+	 * player sees, never on the roof.
+	 */
+	@GameTest
+	public void indoorsTheChestLandsInTheRoom(GameTestHelper h) {
+		defaults(h);
+		floor(h);
+		for (int x = 0; x < 8; x++) {
+			for (int z = 0; z < 8; z++) {
+				h.setBlock(new BlockPos(x, 4, z), Blocks.STONE); // ceiling
+				if (x == 0 || x == 7 || z == 0 || z == 7) {
+					h.setBlock(new BlockPos(x, 2, z), Blocks.STONE);
+					h.setBlock(new BlockPos(x, 3, z), Blocks.STONE);
+				}
+			}
+		}
+		ServerLevel level = h.getLevel();
+		ServerPlayer p = survivalPlayer(h, new Vec3(4.5, 2, 4.5));
+		BlockPos center = p.blockPosition();
+		BlockPos column = h.absolutePos(new BlockPos(6, 2, 4));
+		Optional<Vec3> feet = Spots.column(level, column.getX(), center.getY(), column.getZ(), EntityTypes.PLAYER);
+		h.assertTrue(feet.isPresent() && feet.get().y == center.getY(), "nearest height first, not the roof: " + feet);
+		for (int i = 0; i < 10; i++) {
+			Optional<BlockPos> spot = ChestFromSky.findSpot(level, center, level.getRandom());
+			h.assertTrue(spot.isPresent() && spot.get().getY() == center.getY(), "in the room: " + spot);
+		}
+		ActiveEvent ev = start(h, ChestFromSky.ID, p);
+		h.assertTrue(ev.isStopped(), "instant");
+		List<BlockPos> chests = chests(level, center);
+		h.assertValueEqual(chests.size(), 1, "one chest");
+		boolean inRoom = false;
+		for (int x = 1; x <= 6; x++) for (int z = 1; z <= 6; z++) inRoom |= h.absolutePos(new BlockPos(x, 2, z)).equals(chests.getFirst());
+		h.assertTrue(inRoom, "chest inside the room: " + chests.getFirst());
+		for (BlockPos pos : chests) level.removeBlock(pos, false);
 		cleanup(h, p);
 		h.succeed();
 	}
