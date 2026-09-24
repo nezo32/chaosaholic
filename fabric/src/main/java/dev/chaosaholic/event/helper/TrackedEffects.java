@@ -16,10 +16,34 @@ import net.minecraft.world.entity.LivingEntity;
  * Mob effects an event keeps on entities for its whole run. Given with the instance's remaining time (plus a small
  * margin), so even a crash leaves at most that much behind; re-applied every {@link ChaosLimits#EFFECT_REFRESH_TICKS}
  * if removed (milk) or after an extension; removed when the entity stops being affected, unless something else
- * replaced it with a stronger or longer effect in the meantime.
+ * replaced it with a stronger or longer effect in the meantime (longer than anything this tracker gave).
  */
 public final class TrackedEffects {
-	private record Entry(LivingEntity entity, Holder<MobEffect> effect, int amplifier) {}
+	private static final class Entry {
+		private final LivingEntity entity;
+		private final Holder<MobEffect> effect;
+		private final int amplifier;
+		/** Longest duration this tracker ever gave: a current effect longer than that is not ours. */
+		private int applied;
+
+		private Entry(LivingEntity entity, Holder<MobEffect> effect, int amplifier) {
+			this.entity = entity;
+			this.effect = effect;
+			this.amplifier = amplifier;
+		}
+
+		LivingEntity entity() {
+			return entity;
+		}
+
+		Holder<MobEffect> effect() {
+			return effect;
+		}
+
+		int amplifier() {
+			return amplifier;
+		}
+	}
 
 	private final ActiveEvent owner;
 	private final List<Entry> entries = new ArrayList<>();
@@ -41,6 +65,7 @@ public final class TrackedEffects {
 
 	private boolean apply(Entry e) {
 		int duration = owner.remainingTicks() + ChaosLimits.EFFECT_MARGIN_TICKS;
+		e.applied = Math.max(e.applied, duration);
 		return e.entity().addEffect(new MobEffectInstance(e.effect(), duration, e.amplifier(), false, true, true));
 	}
 
@@ -87,8 +112,8 @@ public final class TrackedEffects {
 	private void remove(Entry e) {
 		MobEffectInstance current = e.entity().getEffect(e.effect());
 		if (current == null || current.isInfiniteDuration() || current.getAmplifier() != e.amplifier()) return;
-		// ours or shorter; a longer one (beacon, potion drunk during the event) is left alone
-		if (current.getDuration() <= owner.remainingTicks() + ChaosLimits.EFFECT_MARGIN_TICKS + 2 * ChaosLimits.EFFECT_REFRESH_TICKS) {
+		// ours (never longer than what we gave); a longer one (beacon, potion drunk during the event) is left alone
+		if (current.getDuration() <= e.applied) {
 			e.entity().removeEffect(e.effect());
 		}
 	}

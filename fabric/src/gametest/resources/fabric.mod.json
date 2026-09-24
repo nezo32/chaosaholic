@@ -1,0 +1,51 @@
+{
+	"schemaVersion": 1,
+	"id": "chaosaholic-gametest",
+	"version": "1.0.0",
+	"name": "Chaosaholic GameTests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"dev.chaosaholic.test.ChaosModeGameTests",
+			"dev.chaosaholic.test.ChaosLevelGameTests",
+			"dev.chaosaholic.test.ChaosLifecycleGameTests",
+			"dev.chaosaholic.test.ChaosNotifyGameTests",
+			"dev.chaosaholic.test.events.AnvilRainGameTests",
+			"dev.chaosaholic.test.events.BeeSwarmGameTests",
+			"dev.chaosaholic.test.events.BlackoutGameTests",
+			"dev.chaosaholic.test.events.BouncyFloorGameTests",
+			"dev.chaosaholic.test.events.ButterfingersGameTests",
+			"dev.chaosaholic.test.events.ChestFromSkyGameTests",
+			"dev.chaosaholic.test.events.ChickenApocalypseGameTests",
+			"dev.chaosaholic.test.events.DoubleXpGameTests",
+			"dev.chaosaholic.test.events.EternalNightGameTests",
+			"dev.chaosaholic.test.events.FeatherFallGameTests",
+			"dev.chaosaholic.test.events.GlowPartyGameTests",
+			"dev.chaosaholic.test.events.GravityFlipGameTests",
+			"dev.chaosaholic.test.events.HealingAuraGameTests",
+			"dev.chaosaholic.test.events.HungerGamesGameTests",
+			"dev.chaosaholic.test.events.IronSkinGameTests",
+			"dev.chaosaholic.test.events.LightningStormGameTests",
+			"dev.chaosaholic.test.events.LootPinataGameTests",
+			"dev.chaosaholic.test.events.MidasHourGameTests",
+			"dev.chaosaholic.test.events.MobSurpriseGameTests",
+			"dev.chaosaholic.test.events.MoonJumpGameTests",
+			"dev.chaosaholic.test.events.RandomTeleportGameTests",
+			"dev.chaosaholic.test.events.ScreenShakeGameTests",
+			"dev.chaosaholic.test.events.SheepDiscoGameTests",
+			"dev.chaosaholic.test.events.SlipperyGameTests",
+			"dev.chaosaholic.test.events.SluggishGameTests",
+			"dev.chaosaholic.test.events.SpeedDemonGameTests",
+			"dev.chaosaholic.test.events.SwapGameTests",
+			"dev.chaosaholic.test.events.TinyWorldGameTests",
+			"dev.chaosaholic.test.events.TntRainGameTests",
+			"dev.chaosaholic.test.events.UpsideDownGameTests"
+		],
+		"fabric-client-gametest": [
+			"dev.chaosaholic.test.ChaosClientGameTest"
+		]
+	},
+	"depends": {
+		"chaosaholic": "*"
+	}
+}

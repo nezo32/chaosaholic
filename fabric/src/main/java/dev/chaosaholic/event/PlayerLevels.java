@@ -11,9 +11,8 @@ import net.minecraft.resources.Identifier;
  * Not copied on death: the respawned player starts without one, which re-initializes it to the current level.
  */
 public final class PlayerLevels {
-	public static final AttachmentType<Integer> MARK = AttachmentRegistry.<Integer>builder()
-			.persistent(Codec.INT)
-			.buildAndRegister(Identifier.fromNamespaceAndPath(Chaosaholic.MOD_ID, "level_mark"));
+	public static final AttachmentType<Integer> MARK = AttachmentRegistry.create(
+			Identifier.fromNamespaceAndPath(Chaosaholic.MOD_ID, "level_mark"), builder -> builder.persistent(Codec.INT));
 
 	private PlayerLevels() {}
 

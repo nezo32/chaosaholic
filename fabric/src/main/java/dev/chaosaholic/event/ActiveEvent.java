@@ -35,11 +35,11 @@ public final class ActiveEvent {
 	private final ServerLevel level;
 	private final Map<UUID, ServerPlayer> players = new LinkedHashMap<>();
 	private final List<Scheduled> schedule = new ArrayList<>();
-	private final TrackedEffects effects = new TrackedEffects(this);
-	private final TrackedModifiers modifiers = new TrackedModifiers(this);
-	private final OwnedEntities entities = new OwnedEntities(this);
-	private final TrackedNames names = new TrackedNames(this);
-	private final TempBlocks blocks = new TempBlocks(this);
+	private final TrackedEffects effects;
+	private final TrackedModifiers modifiers;
+	private final OwnedEntities entities;
+	private final TrackedNames names;
+	private final TempBlocks blocks;
 	private @Nullable ServerBossEvent bossBar;
 	private @Nullable Object state;
 	private int remaining;
@@ -55,6 +55,12 @@ public final class ActiveEvent {
 		this.level = context.level();
 		this.remaining = event.isInstant() ? 0 : Stacking.initial(duration, ChaosLimits.MAX_REMAINING_TICKS);
 		this.total = remaining;
+		// after event/context: the trackers read the id and level
+		this.effects = new TrackedEffects(this);
+		this.modifiers = new TrackedModifiers(this);
+		this.entities = new OwnedEntities(this);
+		this.names = new TrackedNames(this);
+		this.blocks = new TempBlocks(this);
 	}
 
 	/** Unique per instance (also across restarts); stored on owned entities and temporary blocks. */

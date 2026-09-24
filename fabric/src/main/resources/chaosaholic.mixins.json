@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "dev.chaosaholic.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"EntityMixin",
+		"LevelStorageAccessMixin",
+		"MinecraftServerAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
