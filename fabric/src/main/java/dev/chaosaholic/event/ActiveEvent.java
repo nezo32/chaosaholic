@@ -54,7 +54,7 @@ public final class ActiveEvent {
 		this.event = event;
 		this.context = context;
 		this.level = context.level();
-		this.remaining = event.isInstant() ? 0 : Stacking.initial(duration, ChaosLimits.MAX_REMAINING_TICKS);
+		this.remaining = event.isInstant() ? 0 : Stacking.initial(duration, cap(event));
 		this.total = remaining;
 		// after event/context: the trackers read the id and level
 		this.effects = new TrackedEffects(this);
@@ -218,11 +218,16 @@ public final class ActiveEvent {
 		}
 	}
 
-	/** Stacking extension: remaining += added (capped), total grows along. */
+	/** Stacking extension: remaining += added (capped by {@link ChaosEvent#maxRemainingTicks}), total grows along. */
 	void extend(int added) {
-		Stacking.Timer t = Stacking.extend(remaining, total, added, ChaosLimits.MAX_REMAINING_TICKS);
+		Stacking.Timer t = Stacking.extend(remaining, total, added, cap(event));
 		remaining = t.remaining();
 		total = t.total();
+	}
+
+	/** The event's own cap on the remaining time, never above the framework cap. */
+	private static int cap(ChaosEvent event) {
+		return Math.max(1, Math.min(ChaosLimits.MAX_REMAINING_TICKS, event.maxRemainingTicks()));
 	}
 
 	/** Gametests and debugging: jump the timer (e.g. to 1 so the instance ends on the next tick). */

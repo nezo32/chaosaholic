@@ -41,6 +41,7 @@ public class BlackoutGameTests {
 			h.assertTrue(again == ev, "extended, not duplicated");
 		}
 		h.assertTrue(ev.remainingTicks() <= Blackout.MAX_TICKS, "capped at 10 s, got " + ev.remainingTicks());
+		h.assertTrue(ev.totalTicks() <= Blackout.MAX_TICKS, "total (boss bar) capped too, got " + ev.totalTicks());
 		manager(h).stop(ev, StopReason.FORCED);
 		h.assertFalse(p.hasEffect(MobEffects.DARKNESS), "removed after an extended run");
 		cleanup(h, p);

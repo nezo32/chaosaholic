@@ -33,7 +33,7 @@ public final class HealingAura extends ChaosEvent {
 
 	@Override
 	public void onTick(ActiveEvent ev) {
-		if (ev.age() == 0 || !ev.every(HEART_PERIOD)) return; // the start already showed hearts
+		if (!ev.every(HEART_PERIOD)) return; // age() is at least 1 here: the start already showed hearts
 		for (ServerPlayer p : ev.players()) {
 			ev.level().sendParticles(ParticleTypes.HEART, p.getX(), p.getY() + 2.1, p.getZ(), 1, 0.3, 0.1, 0.3, 0.0);
 		}

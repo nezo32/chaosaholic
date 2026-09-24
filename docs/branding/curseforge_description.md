@@ -96,14 +96,14 @@ Durations are random within the range. An event never has more than 180 s left, 
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
 | Midas Hour | Ores you mine drop their loot twice | 60–120 s | Ores only, with the right tool. Fortune rolls again for the bonus. No bonus with Silk Touch or for ores that drop themselves (no ore-block duping) |
-| Feather Fall | No fall damage | 60–120 s | Only fall damage |
+| Feather Fall | No fall damage | 60–120 s | Only fall damage. Ends in mid-air? 10 s of Slow Falling |
 | Loot Piñata | Mobs you kill drop extra random loot | 60–120 s | 1–3 extra stacks of survival items per kill, at most 48 per event |
 | Speed Demon | Speed III and Haste II | 30–60 s | Ends with the event |
 | Sky Chest | A chest with random structure loot lands 2–5 blocks from you. It's a normal chest and it's yours to keep | instant | Only into empty air on a safe spot, never on you and never replacing a block |
 | Double XP | Experience orbs you pick up count double | 60–120 s | Orbs only, after Mending. The extra XP can level you up, and that rolls another event |
 | Healing Aura | Regeneration II | 20–40 s | Ends with the event |
 | Iron Skin | Resistance II | 30–60 s | Ends with the event |
-| Moon Jump | Jump Boost III and no fall damage | 30–60 s | No fall damage for the whole event |
+| Moon Jump | Jump Boost III and no fall damage | 30–60 s | No fall damage for the whole event. Ends in mid-air? 10 s of Slow Falling |
 
 ### 😈 Bad
 
@@ -127,7 +127,7 @@ Durations are random within the range. An event never has more than 180 s left, 
 | Gravity Flip | You float up and drift down by turns | 20–30 s | Slow Falling all the way, at most 6 blocks up, always ends on a descent |
 | Chickenpocalypse | Mobs within 12 blocks turn into chickens | 30–60 s | At most 16 mobs. Bosses, pets, named and leashed mobs are left alone. Each chicken turns back into the exact mob it was (if the chicken dies, so does the mob) |
 | Tiny World | You and the mobs around you shrink to half size | 30–60 s | Radius 12. Bosses, pets and named mobs are left alone. Everyone grows back at the end |
-| Bouncy Floor | Landing bounces you like slime | 30–60 s | No fall damage while it lasts. Sneak to stop bouncing |
+| Bouncy Floor | Landing bounces you like slime | 30–60 s | No fall damage while it lasts. Sneak to stop bouncing. Ends mid-bounce? 10 s of Slow Falling |
 | Upside Down | Mobs within 16 blocks flip upside down | 30–60 s | At most 32 mobs. Original names come back at the end |
 | Swap | You swap places with a random mob within 16 blocks | instant | Only when both spots are safe. No fall damage from it |
 | Sheep Disco | 3–5 rainbow sheep appear and dance to a tune | 30–45 s | They can't be hurt, sheared or bred (no free wool farm), and leave at the end |

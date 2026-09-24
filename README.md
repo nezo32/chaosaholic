@@ -69,14 +69,14 @@ left, even after extensions.
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
 | Midas Hour | Ores you mine drop their loot twice | 60–120 s | Only blocks in the `c:ores` tag, with the right tool, and only when `block_drops` is on. The bonus is a second, independent roll (Fortune rolls again). No bonus for drops that are the ore block itself: Silk Touch and self-dropping ores such as ancient debris get nothing extra, so ore blocks can't be duplicated |
-| Feather Fall | You take no fall damage | 60–120 s | Only fall damage is cancelled, nothing else |
+| Feather Fall | You take no fall damage | 60–120 s | Only fall damage is cancelled (ender pearls still hurt). If it ends while you're in the air you get 10 s of Slow Falling to land |
 | Loot Piñata | Mobs you kill drop extra random loot | 60–120 s | 1–3 extra stacks of plain survival items per kill (food, ingots, gems, arrows, a rare golden apple or diamond), at most 48 stacks per event. Nothing from mobs spawned by other events, nothing when `mob_drops` is off |
 | Speed Demon | Speed III and Haste II | 30–60 s | Both effects end with the event |
 | Sky Chest | A chest lands 2–5 blocks from you, filled from a random vanilla structure loot table. It's a normal, permanent chest and it's yours to keep | instant | Only into an empty air block on a safe, solid spot inside the world border, never on you or any other mob. It never replaces a block. No spot, no chest: another event is rolled |
 | Double XP | Experience orbs you pick up give twice their points | 60–120 s | Only orbs (not `/xp` or advancements), and only what's left after Mending repaired your gear. The extra XP can level you up, and that rolls another event |
 | Healing Aura | Regeneration II | 20–40 s | Ends with the event |
 | Iron Skin | Resistance II (40 % less damage) | 30–60 s | Ends with the event |
-| Moon Jump | Jump Boost III and no fall damage | 30–60 s | No fall damage for the whole event. A jump still in the air when it ends lands without the boost: half a heart at most |
+| Moon Jump | Jump Boost III and no fall damage | 30–60 s | No fall damage for the whole event. If it ends while you're in the air you get 10 s of Slow Falling to land |
 
 ### 😈 Bad
 
@@ -100,7 +100,7 @@ left, even after extensions.
 | Gravity Flip | You float up (Levitation II, 3 s) and drift down (4 s) by turns | 20–30 s | Slow Falling for the whole event, so every descent is soft. You never rise more than 6 blocks above the ground, the last 5 seconds are always a descent, and if the event ends while you're in the air you get 10 s of Slow Falling to land |
 | Chickenpocalypse | Mobs within 12 blocks turn into chickens (babies into chicks) | 30–60 s | At most 16 mobs, nearest first. Players, bosses, pets, named mobs, riders, leashed mobs and mobs in water are left alone. Each chicken turns back into the exact mob it was (health, gear, trades…), even after a chunk reload or a crash. If the chicken dies, the mob is gone for good |
 | Tiny World | You and the mobs around you shrink to half size | 30–60 s | Radius 12 blocks, at most 64 mobs. Bosses, pets, named mobs and riders are left alone. Everyone grows back at the end (the change is never saved, so it can't stick) |
-| Bouncy Floor | Landing bounces you back up like a slime block | 30–60 s | No fall damage while it lasts. Sneak to land without bouncing |
+| Bouncy Floor | Landing bounces you back up like a slime block | 30–60 s | No fall damage while it lasts. Sneak to land without bouncing. If it ends mid-bounce you get 10 s of Slow Falling to land |
 | Upside Down | Mobs within 16 blocks are renamed Dinnerbone and flip upside down | 30–60 s | At most 32 mobs; mobs that walk in later flip too. Players and bosses never flip. The flip name is never shown. Original names come back at the end, even after a crash; a mob you name-tag during the event keeps its new name |
 | Swap | You swap places with a random mob within 16 blocks | instant | Only mobs that aren't bosses, pets, named or riding, and only when both spots are safe for both of you. Speed and fall distance are reset, so the swap can't hurt or save anyone. Not while you ride something. No mob, no swap: another event is rolled |
 | Sheep Disco | 3–5 rainbow sheep appear 2–5 blocks around you and dance to a note-block tune | 30–45 s | The sheep can't be hurt, sheared or bred (no free wool, mutton or XP). They leave at the end without dropping anything |
@@ -167,7 +167,7 @@ Bad events never make a death unavoidable:
 - hazards land around you, never on your spot: a TNT or a bolt whose spot a player walked up to is skipped;
 - one anvil hit deals at most 6 damage, lightning is visual only, and Hunger Games never lets you starve;
 - on Hardcore, a TNT blast or anvil hit that would kill you is cancelled, and TNT fuses are a second longer;
-- movement events end in a safe state (Gravity Flip always ends on slow falling);
+- movement events end in a safe state (Gravity Flip always ends on slow falling; leaving Moon Jump, Feather Fall, Bouncy Floor or Gravity Flip in mid-air gives 10 s of Slow Falling);
 - Mob Surprise, Bee Swarm and Hunger Games never start on Peaceful. Difficulty sets the wave and swarm size, and
   Hardcore counts as Hard;
 - `mob_griefing` decides whether TNT Rain breaks blocks, and `tnt_explodes` off means it doesn't explode at all.

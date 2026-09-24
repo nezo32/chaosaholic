@@ -10,6 +10,7 @@ import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.Category;
 import dev.chaosaholic.event.ChaosEvent;
 import dev.chaosaholic.event.RemoveReason;
+import dev.chaosaholic.event.helper.SafeLanding;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleTypes;
@@ -33,7 +34,7 @@ import net.minecraft.world.level.block.state.BlockState;
  *       drifts down for the rest of that up phase (checked every {@link #CAP_CHECK_TICKS} ticks);</li>
  *   <li>the last {@link #FINAL_DOWN_TICKS} are always a down phase (a flip up happens only with enough time left);</li>
  *   <li>when a player stops being affected (end, stop, logout, dimension change, Creative) while in the air, they
- *       get {@link #SAFE_TAIL_TICKS} of plain Slow Falling to land softly; it is saved with the player on logout;</li>
+ *       get the {@link SafeLanding} tail of plain Slow Falling to land softly; it is saved with the player on logout;</li>
  *   <li>Levitation is given per phase (never longer than the phase + {@link #MARGIN_TICKS}) and not through the
  *       tracker, so a crash leaves at most a few seconds of it, always together with the longer Slow Falling.</li>
  * </ul>
@@ -49,11 +50,10 @@ public final class GravityFlip extends ChaosEvent {
 	public static final int LEVITATION_AMPLIFIER = 1;
 	/** Max height above the ground during an up phase, in blocks. */
 	public static final int MAX_RISE = 6;
+	/** How often (ticks) rising players are checked against {@link #MAX_RISE} during an up phase. */
 	public static final int CAP_CHECK_TICKS = 5;
 	/** Extra Levitation time beyond a phase, so the effect never flickers off before the flip. */
 	public static final int MARGIN_TICKS = 10;
-	/** Slow Falling given to airborne players who leave the event. */
-	public static final int SAFE_TAIL_TICKS = 200;
 
 	private static final class State {
 		boolean up = true;
@@ -131,11 +131,7 @@ public final class GravityFlip extends ChaosEvent {
 		ev.state(State::new).phase.remove(player.getUUID());
 		removeLevitation(player);
 		ev.effects().revert(player); // before the tail, so the framework's revert cannot take the tail away
-		if (reason == RemoveReason.DEATH || !player.isAlive() || player.onGround()) return;
-		MobEffectInstance current = player.getEffect(MobEffects.SLOW_FALLING);
-		if (current == null || (!current.isInfiniteDuration() && current.getDuration() < SAFE_TAIL_TICKS)) {
-			player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, SAFE_TAIL_TICKS, 0, false, true, true));
-		}
+		SafeLanding.give(player, reason);
 	}
 
 	/** Removes Levitation only if it is ours: our amplifier and never longer than one phase. */

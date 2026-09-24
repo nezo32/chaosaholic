@@ -13,8 +13,8 @@ import net.minecraft.world.effect.MobEffects;
 
 /**
  * Bad: Darkness (not Blindness: pulsing, less nauseating, presentation.md §5) for 5-10 s through the effect tracker.
- * Not a hazard, so no warning. Extensions never push the remaining time past {@link #MAX_TICKS}, so a blackout stays
- * short however often it is rolled.
+ * Not a hazard, so no warning. Extensions never push the remaining time (nor the boss bar's total) past
+ * {@link #MAX_TICKS} ({@link #maxRemainingTicks}), so a blackout stays short however often it is rolled.
  */
 public final class Blackout extends ChaosEvent {
 	/** Longest remaining time, also after extensions (10 s). */
@@ -31,9 +31,8 @@ public final class Blackout extends ChaosEvent {
 	}
 
 	@Override
-	public void onExtended(ActiveEvent ev, int addedTicks) {
-		// an effect already given for longer is still ours at the end (never longer than what the tracker gave)
-		if (ev.remainingTicks() > MAX_TICKS) ev.setRemainingTicks(MAX_TICKS);
+	public int maxRemainingTicks() {
+		return MAX_TICKS;
 	}
 
 	@Override
