@@ -63,7 +63,8 @@ public class ChaosClientGameTest implements FabricClientGameTest {
 		leaveWorld(ctx);
 
 		setLanguage(ctx, "ru_ru");
-		openCreateWorld(ctx);
+		ctx.runOnClient(mc -> CreateWorldScreen.openFresh(mc, () -> mc.gui.setScreen(new TitleScreen())));
+		ctx.waitForScreen(CreateWorldScreen.class);
 		String ru = widgetText(ctx, "Режим Chaosaholic");
 		ctx.takeScreenshot("chaosaholic_create_world_game_tab_ru");
 		ctx.clickScreenButton("gui.cancel");

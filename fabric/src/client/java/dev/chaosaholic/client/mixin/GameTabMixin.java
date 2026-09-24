@@ -14,13 +14,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Adds the "Chaosaholic Mode: ON/OFF" toggle to the "Game" tab of the Create World screen, right below
- * "Difficulty" (the third two-argument {@code RowHelper.addChild} of the constructor: name, game mode, difficulty;
- * the same on 26.2 and 26.3). The value lives on the screen (CreateWorldScreenMixin), not in a game rule.
+ * "Difficulty": after the third {@code WorldCreationUiState.addListener} of the constructor (name tooltip, game mode,
+ * difficulty; identical bytecode on 26.2 and 26.3), before "Allow Commands" is added. The value lives on the screen
+ * (CreateWorldScreenMixin), not in a game rule.
  */
 @Mixin(targets = "net.minecraft.client.gui.screens.worldselection.CreateWorldScreen$GameTab")
 public abstract class GameTabMixin {
 	@Inject(method = "<init>", at = @At(value = "INVOKE", ordinal = 2, shift = At.Shift.AFTER,
-			target = "Lnet/minecraft/client/gui/layouts/GridLayout$RowHelper;addChild(Lnet/minecraft/client/gui/layouts/LayoutElement;Lnet/minecraft/client/gui/layouts/LayoutSettings;)Lnet/minecraft/client/gui/layouts/LayoutElement;"))
+			target = "Lnet/minecraft/client/gui/screens/worldselection/WorldCreationUiState;addListener(Ljava/util/function/Consumer;)V"))
 	private void chaosaholic$addToggle(CreateWorldScreen screen, CallbackInfo ci, @Local GridLayout.RowHelper helper) {
 		CreateWorldModeHolder holder = (CreateWorldModeHolder) screen;
 		helper.addChild(CycleButton.onOffBuilder(holder.chaosaholic$isModeEnabled())

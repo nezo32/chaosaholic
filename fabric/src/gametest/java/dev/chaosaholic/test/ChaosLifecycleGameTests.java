@@ -249,4 +249,21 @@ public class ChaosLifecycleGameTests {
 		cleanup(h, p);
 		h.succeed();
 	}
+
+	/** adopt(): an entity that added itself (e.g. FallingBlockEntity.fall) becomes owned, unsaved and removed at the end. */
+	@GameTest
+	public void adoptedEntityIsOwned(GameTestHelper h) {
+		defaults(h);
+		TestEvents.ensureRegistered();
+		ServerPlayer p = survivalPlayer(h);
+		ActiveEvent ev = TestSupport.start(h, "test_marker", p);
+		Zombie zombie = mob(h, EntityTypes.ZOMBIE, new Vec3(3.5, 2, 3.5));
+		h.assertTrue(ev.entities().adopt(zombie), "adopted");
+		h.assertTrue(ev.entities().owns(zombie) && OwnedEntities.isUnsaved(zombie) && !zombie.shouldBeSaved(), "owned, never saved");
+		h.assertTrue(zombie.entityTags().contains(Marks.OWNED_TAG), "tag");
+		manager(h).stop(ev, StopReason.FORCED);
+		h.assertTrue(zombie.isRemoved(), "removed at the end");
+		cleanup(h, p);
+		h.succeed();
+	}
 }

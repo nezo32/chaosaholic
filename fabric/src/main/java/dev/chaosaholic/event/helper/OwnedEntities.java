@@ -58,6 +58,17 @@ public final class OwnedEntities {
 	}
 
 	/**
+	 * Takes ownership of an entity that is already in the instance's level (e.g. what {@code FallingBlockEntity.fall}
+	 * returns, which adds itself). Returns false (and leaves it alone) when a cap is reached.
+	 */
+	public boolean adopt(Entity entity) {
+		if (entity instanceof Player || entity.isRemoved() || entity.level() != owner.level() || !canSpawn()) return false;
+		mark(entity, Optional.empty());
+		entities.put(entity.getUUID(), entity);
+		return true;
+	}
+
+	/**
 	 * Replaces {@code original} with {@code replacement} (placed at the original's position and rotation) and keeps
 	 * the original's full saved data on the replacement, so the end of the event - or a later load after a crash -
 	 * brings the original back where the replacement is. Refuses players, passengers, vehicles and entities that
