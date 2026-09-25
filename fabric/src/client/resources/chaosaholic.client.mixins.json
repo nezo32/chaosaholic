@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "dev.chaosaholic.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"CreateWorldScreenMixin",
+		"GameRendererMixin",
+		"GameTabMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

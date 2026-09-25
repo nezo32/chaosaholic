@@ -1,0 +1,16 @@
+{
+	"required": true,
+	"package": "dev.chaosaholic.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"EntityMixin",
+		"ExperienceOrbMixin",
+		"LevelStorageAccessMixin",
+		"MinecraftServerAccessor",
+		"MobEffectInstanceAccessor",
+		"SheepMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

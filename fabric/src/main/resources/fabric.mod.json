@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "chaosaholic",
+	"version": "${version}",
+	"name": "Chaosaholic",
+	"description": "Level up. Unleash chaos. Survive it. Every experience level you gain starts a random chaos event: good, bad or just weird.",
+	"authors": ["nezo"],
+	"contact": {
+		"homepage": "https://github.com/nezo32/chaosaholic",
+		"sources": "https://github.com/nezo32/chaosaholic",
+		"issues": "https://github.com/nezo32/chaosaholic/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/chaosaholic/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["dev.chaosaholic.Chaosaholic"],
+		"client": ["dev.chaosaholic.client.ChaosaholicClient"],
+		"modmenu": ["dev.chaosaholic.client.ModMenuIntegration"]
+	},
+	"mixins": [
+		"chaosaholic.mixins.json",
+		{ "config": "chaosaholic.client.mixins.json", "environment": "client" }
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"fabric-api": "*",
+		"minecraft": ">=26.2 <26.4-",
+		"java": ">=25"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}
