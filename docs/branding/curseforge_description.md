@@ -50,7 +50,7 @@ When Chaosaholic Mode is on, each experience level a player gains does the follo
    show up on the actionbar. A sound plays.
 7. **Countdown:** a boss bar in the category colour shows the event and the time left. Several events can run at
    once (up to 8), each with its own bar. Rolling one you already have extends it instead (180 s at most). Instant
-   events (Sky Chest, Swap, Random Teleport) just happen, with no bar.
+   events (Chest from the Sky, Swap, Random Teleport) just happen, with no bar.
 8. **Cleanup:** when the time is up, the event undoes itself: effects end, spawned mobs, bees and party sheep are
    removed, chickens turn back, the time of day is restored. Leaving, dying, changing dimension or switching to
    Creative ends it for you at once.
@@ -83,7 +83,7 @@ Boss bars and **danger warnings are always shown**, whatever you pick.
 | `/chaosaholic event <id> weight [0..1000]` | How often an event rolls compared to the others (default 100, 0 = never) |
 | `/chaosaholic trigger <id> [players]` | Starts that event right now, even with the mode off |
 | `/chaosaholic roll [players]` | Rolls a random event right now, like a level-up |
-| `/chaosaholic stop [players]` | Ends every event on those players and cleans up |
+| `/chaosaholic stop [players]` | Ends every event on those players and cleans up (a world-scope event carries on for everyone else) |
 
 In single-player these need cheats: Allow Commands on, or Open to LAN with Allow Cheats on.
 
@@ -99,7 +99,7 @@ Durations are random within the range. An event never has more than 180 s left, 
 | Feather Fall | No fall damage | 60–120 s | Only fall damage. Ends in mid-air? 10 s of Slow Falling |
 | Loot Piñata | Mobs you kill drop extra random loot | 60–120 s | 1–3 extra stacks of survival items per kill, at most 48 per event |
 | Speed Demon | Speed III and Haste II | 30–60 s | Ends with the event |
-| Sky Chest | A chest with random structure loot lands 2–5 blocks from you. It's a normal chest and it's yours to keep | instant | Only into empty air on a safe spot, never on you and never replacing a block |
+| Chest from the Sky | A chest with random structure loot lands 2–5 blocks from you. It's a normal chest and it's yours to keep | instant | Only into empty air on a safe spot, never on you and never replacing a block |
 | Double XP | Experience orbs you pick up count double | 60–120 s | Orbs only, after Mending. The extra XP can level you up, and that rolls another event |
 | Healing Aura | Regeneration II | 20–40 s | Ends with the event |
 | Iron Skin | Resistance II | 30–60 s | Ends with the event |
@@ -125,10 +125,10 @@ Durations are random within the range. An event never has more than 180 s left, 
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
 | Gravity Flip | You float up and drift down by turns | 20–30 s | Slow Falling all the way, at most 6 blocks up, always ends on a descent |
-| Chickenpocalypse | Mobs within 12 blocks turn into chickens | 30–60 s | At most 16 mobs. Bosses, pets, named and leashed mobs, villagers with a job, traders and player-built golems are left alone. Only players can hurt the chickens. Each chicken turns back into the exact mob it was (if a player kills the chicken, the mob is gone too) |
+| Chicken Apocalypse | Mobs within 12 blocks turn into chickens | 30–60 s | At most 16 mobs. Bosses, pets, named and leashed mobs, villagers with a job, traders and player-built golems are left alone. Only players can hurt the chickens. Each chicken turns back into the exact mob it was (if a player kills the chicken, the mob is gone too) |
 | Tiny World | You and the mobs around you shrink to half size | 30–60 s | Radius 12. Bosses, pets and named mobs are left alone. Everyone grows back at the end |
 | Bouncy Floor | Landing bounces you like slime | 30–60 s | No fall damage while it lasts. Sneak to stop bouncing. Ends mid-bounce? 10 s of Slow Falling |
-| Upside Down | Mobs within 16 blocks flip upside down | 30–60 s | At most 32 mobs. Original names come back at the end |
+| Upside Down Names | Mobs within 16 blocks flip upside down | 30–60 s | At most 32 mobs. Original names come back at the end |
 | Swap | You swap places with a random mob within 16 blocks | instant | Only when both spots are safe. No fall damage from it |
 | Sheep Disco | 3–5 rainbow sheep appear and dance to a tune | 30–45 s | They can't be hurt, sheared or bred (no free wool farm), and leave at the end |
 | Slippery | Every block feels like ice | 30–45 s | Ends with the event |
@@ -156,9 +156,9 @@ shake; players without it can still join and play.
 - Eternal Night changes the time for the whole dimension, not just for you, and nobody can sleep it away.
 - Screen Shake is invisible without the mod on your client (or with screen effects off): you just get the boss bar
   and the sound.
-- Upside Down renames mobs to Dinnerbone for a while (the name shows when you look straight at a mob); pets and
+- Upside Down Names renames mobs Dinnerbone for a while (the name shows when you look straight at a mob); pets and
   name-tagged mobs get their names back at the end.
-- Chickenpocalypse is permanent for a chicken that dies: the original mob is gone with it.
+- Chicken Apocalypse is permanent for a chicken that dies: the original mob is gone with it.
 - Tiny World shrinks your reach and step height along with you (that's vanilla's scale attribute).
 - TNT Rain follows the `mob_griefing` game rule: with it on, the TNT breaks blocks like normal TNT.
 - Milk only helps for a second: an event's effects come back until the event ends.

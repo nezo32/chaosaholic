@@ -32,18 +32,23 @@ import net.minecraft.world.phys.Vec3;
 /**
  * anvil_rain: marks appear during the warning, anvils only after it, never on the player, capped damage, never
  * placed as blocks, capped count, removed when the event is stopped mid-fall.
- * Multi-tick tests allow 3 attempts: {@code /chaosaholic off} in ChaosModeGameTests stops every running event in
- * the parallel batch.
+ *
+ * <p>The event picks targets up to {@link AnvilRain#MAX_DISTANCE} blocks from the player, mostly outside the 8x8 test
+ * structure, where entities may not tick (only the structure's chunks are force-loaded; mock players never tick, so
+ * they load nothing around them). So the tests check the anvils the event releases right away and after a forced
+ * stop, and watch an anvil land only when it was dropped inside the structure.
  */
 public class AnvilRainGameTests {
-	@GameTest(maxTicks = 300, maxAttempts = 3)
+	@GameTest(maxTicks = 200)
 	public void marksDuringWarningThenAnvilsThatNeverBecomeBlocks(GameTestHelper h) {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);
 		ActiveEvent ev = start(h, "anvil_rain", p);
 		int delay = Warning.delay(ev.context());
 		List<FallingBlockEntity> anvils = new ArrayList<>();
-		List<BlockPos> targets = new ArrayList<>();
+		// inside the structure (air from relative y 0 to 7 over a barrier floor), 4.9 blocks from the player
+		BlockPos inside = h.absolutePos(new BlockPos(5, 0, 5));
+		FallingBlockEntity[] landing = new FallingBlockEntity[1];
 		h.startSequence()
 				.thenWaitUntil(() -> h.assertFalse(AnvilRain.targets(ev).isEmpty(), "a spot is marked"))
 				.thenExecute(() -> {
@@ -60,22 +65,17 @@ public class AnvilRainGameTests {
 					for (AnvilRain.Target t : AnvilRain.targets(ev)) {
 						if (t.anvil() == null) continue;
 						anvils.add(t.anvil());
-						targets.add(t.pos);
-						TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, h.getLevel().registryAccess());
-						t.anvil().saveWithoutId(out);
-						CompoundTag tag = out.buildResult();
-						h.assertValueEqual(tag.getIntOr("FallHurtMax", -1), AnvilRain.MAX_DAMAGE, "damage cap");
-						h.assertTrue(tag.getBooleanOr("CancelDrop", false), "never placed");
-						h.assertFalse(tag.getBooleanOr("DropItem", true), "never dropped as an item");
+						assertNeverABlock(h, t.anvil());
 					}
 					h.assertFalse(anvils.isEmpty(), "anvil found on its target");
+					landing[0] = AnvilRain.drop(ev, inside);
+					h.assertTrue(landing[0] != null, "anvil released inside the structure");
+					assertNeverABlock(h, landing[0]);
 				})
-				.thenWaitUntil(() -> h.assertTrue(anvils.getFirst().isRemoved(), "anvil landed"))
+				.thenWaitUntil(() -> h.assertTrue(landing[0].isRemoved(), "anvil landed"))
 				.thenExecute(() -> {
-					for (BlockPos t : targets) {
-						for (BlockPos pos : BlockPos.betweenClosed(t.offset(-1, -2, -1), t.offset(1, 2, 1))) {
-							h.assertFalse(h.getLevel().getBlockState(pos).is(BlockTags.ANVIL), "no anvil block at " + pos);
-						}
+					for (BlockPos pos : BlockPos.betweenClosed(inside.offset(-1, -1, -1), inside.offset(1, 7, 1))) {
+						h.assertFalse(h.getLevel().getBlockState(pos).is(BlockTags.ANVIL), "no anvil block at " + pos);
 					}
 					manager(h).stop(ev, StopReason.FORCED);
 					for (FallingBlockEntity a : anvils) h.assertTrue(a.isRemoved(), "removed at the end");
@@ -85,7 +85,17 @@ public class AnvilRainGameTests {
 				.thenSucceed();
 	}
 
-	@GameTest(maxTicks = 40, maxAttempts = 3)
+	/** The saved flags that keep a falling anvil of the event from ever becoming a block or an item, and its damage cap. */
+	private static void assertNeverABlock(GameTestHelper h, FallingBlockEntity anvil) {
+		TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, h.getLevel().registryAccess());
+		anvil.saveWithoutId(out);
+		CompoundTag tag = out.buildResult();
+		h.assertValueEqual(tag.getIntOr("FallHurtMax", -1), AnvilRain.MAX_DAMAGE, "damage cap");
+		h.assertTrue(tag.getBooleanOr("CancelDrop", false), "never placed");
+		h.assertFalse(tag.getBooleanOr("DropItem", true), "never dropped as an item");
+	}
+
+	@GameTest(maxTicks = 40)
 	public void cappedAndStopMidFallRemovesAnvils(GameTestHelper h) {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);

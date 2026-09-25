@@ -15,5 +15,7 @@ public enum RemoveReason {
 	/** The player moved to another dimension. */
 	DIMENSION_CHANGE,
 	/** The player switched to Creative or Spectator. */
-	INELIGIBLE
+	INELIGIBLE,
+	/** /chaosaholic stop released the player from a world-scope instance that goes on for the other players. */
+	STOPPED
 }

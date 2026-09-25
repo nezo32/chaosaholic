@@ -29,7 +29,7 @@ When the mode is on, each experience level a player gains does the following:
 6. **Start:** Bad events show their name as a title in red with a short subtitle. Good (green) and Weird (purple)
    events show `✦ Name · subtitle` on the actionbar. A sound plays.
 7. **Countdown:** a boss bar in the category colour shows the event and the time left (`Speed Demon — 42 s`,
-   `m:ss` from one minute). Instant events (Sky Chest, Swap, Random Teleport) just happen, with no bar.
+   `m:ss` from one minute). Instant events (Chest from the Sky, Swap, Random Teleport) just happen, with no bar.
 8. **Cleanup:** when the time is up, the event undoes itself (see [Cleanup guarantees](#cleanup-guarantees)).
 
 Levelling up **during** an event rolls another one. Chaos stacks:
@@ -72,7 +72,7 @@ left, even after extensions.
 | Feather Fall | You take no fall damage | 60–120 s | Only fall damage is cancelled (ender pearls still hurt). If it ends while you're in the air you get 10 s of Slow Falling to land |
 | Loot Piñata | Mobs you kill drop extra random loot | 60–120 s | 1–3 extra stacks of plain survival items per kill (food, ingots, gems, arrows, a rare golden apple or diamond), at most 48 stacks per event. Nothing from mobs spawned by other events, nothing when `mob_drops` is off |
 | Speed Demon | Speed III and Haste II | 30–60 s | Both effects end with the event |
-| Sky Chest | A chest lands 2–5 blocks from you, filled from a random vanilla structure loot table. It's a normal, permanent chest and it's yours to keep | instant | Only into an empty air block on a safe, solid spot inside the world border, never on you or any other mob. It never replaces a block. Indoors it lands in your room (a spot at your height that you can see wins), not on the roof. No spot, no chest: another event is rolled |
+| Chest from the Sky | A chest lands 2–5 blocks from you, filled from a random vanilla structure loot table. It's a normal, permanent chest and it's yours to keep | instant | Only into an empty air block on a safe, solid spot inside the world border, never on you or any other mob. It never replaces a block. Indoors it lands in your room (a spot at your height that you can see wins), not on the roof. No spot, no chest: another event is rolled |
 | Double XP | Experience orbs you pick up give twice their points | 60–120 s | Only orbs (not `/xp` or advancements), and only what's left after Mending repaired your gear. The extra XP can level you up, and that rolls another event |
 | Healing Aura | Regeneration II | 20–40 s | Ends with the event |
 | Iron Skin | Resistance II (40 % less damage) | 30–60 s | Ends with the event |
@@ -98,10 +98,10 @@ left, even after extensions.
 | Event | What happens | Duration | Safety cap |
 |---|---|---|---|
 | Gravity Flip | You float up (Levitation II, 3 s) and drift down (4 s) by turns | 20–30 s | Slow Falling for the whole event, so every descent is soft. You never rise more than 6 blocks above the ground, the last 5 seconds are always a descent, and if the event ends while you're in the air you get 10 s of Slow Falling to land |
-| Chickenpocalypse | Mobs within 12 blocks turn into chickens (babies into chicks) | 30–60 s | At most 16 mobs, nearest first. Players, bosses, pets, named mobs, riders, leashed mobs and mobs holding a leash, mobs in water or lava or in the air, allays, happy ghasts, villagers with a job, wandering traders and player-built iron golems are left alone. Each chicken turns back into the exact mob it was (health, gear, trades…), even after a chunk reload or a crash (next to a spot it doesn't fit in). Only players can hurt the chickens; if a player kills one, the mob is gone for good. The chickens don't breed or lay eggs |
+| Chicken Apocalypse | Mobs within 12 blocks turn into chickens (babies into chicks) | 30–60 s | At most 16 mobs, nearest first. Players, bosses, pets, named mobs, riders, leashed mobs and mobs holding a leash, mobs in water or lava or in the air, allays, happy ghasts, villagers with a job, wandering traders and player-built iron golems are left alone. Each chicken turns back into the exact mob it was (health, gear, trades…), even after a chunk reload or a crash (next to a spot it doesn't fit in). Only players can hurt the chickens; if a player kills one, the mob is gone for good. The chickens don't breed or lay eggs |
 | Tiny World | You and the mobs around you shrink to half size | 30–60 s | Radius 12 blocks, at most 64 mobs. Bosses, pets, named mobs and riders are left alone. Everyone grows back at the end (the change is never saved, so it can't stick) |
 | Bouncy Floor | Landing bounces you back up like a slime block | 30–60 s | No fall damage while it lasts. Sneak to land without bouncing. If it ends mid-bounce you get 10 s of Slow Falling to land |
-| Upside Down | Mobs within 16 blocks are renamed Dinnerbone and flip upside down | 30–60 s | At most 32 mobs; mobs that walk in later flip too. Players and bosses never flip. The flip name doesn't float above the mobs: you only see it when you look straight at one. Original names come back at the end, even after a crash; a mob you name-tag during the event keeps its new name |
+| Upside Down Names | Mobs within 16 blocks are renamed Dinnerbone and flip upside down | 30–60 s | At most 32 mobs; mobs that walk in later flip too. Players and bosses never flip. The flip name doesn't float above the mobs: you only see it when you look straight at one. Original names come back at the end, even after a crash; a mob you name-tag during the event keeps its new name |
 | Swap | You swap places with a random mob within 16 blocks | instant | Only mobs that aren't bosses, pets, named or riding, and only when both spots are safe for both of you. You must see the mob, or it must stand in open space (never a sealed pocket in rock). Speed and fall distance are reset, so the swap can't hurt or save anyone. Not while you ride something. No mob, no swap: another event is rolled |
 | Sheep Disco | 3–5 rainbow sheep appear 2–5 blocks around you and dance to a note-block tune | 30–45 s | The sheep can't be hurt, sheared or bred (no free wool, mutton or XP). They leave at the end without dropping anything |
 | Slippery | Every block feels like ice, for you and up to 16 mobs within 8 blocks | 30–45 s | Ends with the event (the change is never saved) |
@@ -182,15 +182,15 @@ behind:
 | When | What happens |
 |---|---|
 | The timer runs out | The event ends and undoes everything |
-| `/chaosaholic off` or `/chaosaholic stop` | Every running event (or the targets' events) ends at once, with full cleanup |
+| `/chaosaholic off` or `/chaosaholic stop` | Every running event (or the targets' events) ends at once, with full cleanup. A world-scope event shared with players who weren't targeted only releases the targets and carries on for the others |
 | The server stops | Every event ends before the final save |
 | A player logs out, dies, changes dimension or goes Creative/Spectator | That player's effects, size and other changes are removed |
 | A chunk unloads | Spawned mobs, TNT and sheep vanish (they're never saved). Size changes are never saved either |
 | The server crashes | On the next start: spawned entities are gone, chickens turn back into their original mobs, renamed mobs get their names back, and temporary blocks are put back to what they were |
 | An event throws an error | It is logged once, and the event is stopped and cleaned up like any other |
 
-Effects are removed at the end unless you had a longer one of your own. Rewards are real, though: Sky Chest's chest,
-Midas Hour's ores, Loot Piñata's drops and Double XP's experience are yours to keep.
+Effects are removed at the end unless you had a longer one of your own. Rewards are real, though: the chest from
+Chest from the Sky, Midas Hour's ores, Loot Piñata's drops and Double XP's experience are yours to keep.
 
 ## Commands
 
@@ -206,7 +206,7 @@ Commands on, or Open to LAN with Allow Cheats on.
 | `/chaosaholic event <id> weight [0..1000]` | Sets how often an event is rolled compared to the others (default 100, 0 = never). Without a number, shows the weight |
 | `/chaosaholic trigger <id> [targets]` | Starts that event now, even if the mode or the event is off. Still refuses players in Creative/Spectator, players with 8 events, and events that can't start there |
 | `/chaosaholic roll [targets]` | Rolls a random event now, as a level-up would (switches and weights apply), even if the mode is off |
-| `/chaosaholic stop [targets]` | Ends every event affecting the targets, with full cleanup |
+| `/chaosaholic stop [targets]` | Ends every event affecting the targets, with full cleanup. A world-scope event that also affects other players only lets the targets go (their effects and boss bar go away) and carries on for the rest |
 
 Targets default to yourself. Command results (for command blocks): `on`/`off`/`status` return 1 for ON and 0 for
 OFF; `trigger`, `roll` and `stop` return how many events they started or stopped.
@@ -241,9 +241,9 @@ wobble; players without it can still join and play.
   that night.
 - Screen Shake is invisible without the mod on your client (or with screen effects off): you only get the boss bar
   and the sound.
-- Upside Down renames mobs to Dinnerbone for a while (you see the name when you look straight at a mob). Pets and
+- Upside Down Names renames mobs Dinnerbone for a while (you see the name when you look straight at a mob). Pets and
   name-tagged mobs flip too; their names come back at the end.
-- Chickenpocalypse chickens keep the original mob inside them: kill the chicken and the mob is gone for good, and
+- Chicken Apocalypse chickens keep the original mob inside them: kill the chicken and the mob is gone for good, and
   you only get what a chicken drops, not the mob's gear. Nothing else can hurt them (only the void and `/kill`).
 - Butterfingers drops can land where other players or mobs pick them up. Pick yours up quickly.
 - Tiny World uses vanilla's scale attribute, so your reach and step height shrink with you.

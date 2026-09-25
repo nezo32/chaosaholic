@@ -446,14 +446,21 @@ public final class EventManager {
 		}
 	}
 
-	/** Ends every instance affecting {@code player}; returns how many. */
+	/**
+	 * Ends every instance affecting {@code player}; returns how many. A world-scope instance that also affects other
+	 * players only lets {@code player} go ({@link RemoveReason#STOPPED}: their per-player effects are reverted and the
+	 * boss bar disappears for them) and goes on for the others; it ends when {@code player} was the last one.
+	 */
 	public int stopFor(ServerPlayer player) {
 		int n = 0;
 		for (ActiveEvent ev : List.copyOf(active)) {
-			if (ev.playerMap().get(player.getUUID()) == player) {
+			if (ev.playerMap().get(player.getUUID()) != player) continue;
+			if (ev.context().isWorldScope() && ev.playerMap().size() > 1) {
+				removePlayer(ev, player, RemoveReason.STOPPED);
+			} else {
 				stop(ev, StopReason.FORCED);
-				n++;
 			}
+			n++;
 		}
 		return n;
 	}

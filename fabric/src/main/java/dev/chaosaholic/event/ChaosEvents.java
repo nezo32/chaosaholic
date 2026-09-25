@@ -32,8 +32,8 @@ import dev.chaosaholic.event.impl.TntRain;
 import dev.chaosaholic.event.impl.UpsideDown;
 
 /**
- * The registration list: one line per event, grouped good / bad / weird. Every event class already exists (the
- * unimplemented ones return false from canStart), so implementing an event never touches this file.
+ * The registration list: one line per event, grouped good / bad / weird. Every event class already exists, so
+ * implementing an event never touches this file.
  */
 public final class ChaosEvents {
 	private ChaosEvents() {}

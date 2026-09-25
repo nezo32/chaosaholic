@@ -12,9 +12,11 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.chaosaholic.Texts;
 import dev.chaosaholic.core.ChaosLimits;
 import dev.chaosaholic.core.EventIds;
+import dev.chaosaholic.event.ActiveEvent;
 import dev.chaosaholic.event.ChaosEvent;
 import dev.chaosaholic.event.EventManager;
 import dev.chaosaholic.event.EventRegistry;
+import dev.chaosaholic.event.RemoveReason;
 import dev.chaosaholic.mixin.MinecraftServerAccessor;
 import dev.chaosaholic.mode.ChaosSettings;
 import dev.chaosaholic.mode.ModeBootstrap;
@@ -28,6 +30,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.GameType;
 
 /**
@@ -155,6 +158,54 @@ public class ChaosModeGameTests {
 		} finally {
 			defaults(h);
 			cleanup(h, p, creative);
+		}
+		h.succeed();
+	}
+
+	/**
+	 * /chaosaholic stop on a world-scope instance shared with other players only lets the targets go (effects and boss
+	 * bar reverted for them, the instance goes on for the rest); it ends the instance once the last player is stopped.
+	 * A player-scope instance ends as before and leaves the other players' instances alone. GLOBAL_STATE: a world-scope
+	 * start takes in every eligible player of the level.
+	 */
+	@GameTest(environment = TestSupport.GLOBAL_STATE)
+	public void commandStopReleasesTargetsFromSharedEvents(GameTestHelper h) throws CommandSyntaxException {
+		defaults(h);
+		TestEvents.ensureRegistered();
+		ServerPlayer a = survivalPlayer(h);
+		ServerPlayer b = survivalPlayer(h);
+		try {
+			settings(h).setScope(Scope.WORLD);
+			ActiveEvent shared = TestSupport.start(h, "test_marker", a);
+			h.assertTrue(shared.isAffected(a) && shared.isAffected(b), "world scope: both affected");
+			h.assertValueEqual(run(h, op(h), "chaosaholic stop " + a.getGameProfile().name()), 1, "stop result");
+			h.assertFalse(shared.isStopped(), "goes on for the others");
+			h.assertFalse(shared.isAffected(a), "a released");
+			h.assertFalse(a.hasEffect(MobEffects.GLOWING), "a reverted");
+			h.assertFalse(shared.bossBarPlayers().contains(a), "bar gone for a");
+			h.assertTrue(manager(h).activeFor(a).isEmpty(), "nothing left on a");
+			h.assertTrue(shared.isAffected(b), "b still affected");
+			h.assertTrue(b.hasEffect(MobEffects.GLOWING), "b keeps the effect");
+			h.assertTrue(shared.bossBarPlayers().contains(b), "b keeps the bar");
+			for (ServerPlayer other : shared.players()) { // other tests' players, if any: leave b as the last one
+				if (other != b) manager(h).removePlayer(shared, other, RemoveReason.STOPPED);
+			}
+			h.assertValueEqual(run(h, op(h), "chaosaholic stop " + b.getGameProfile().name()), 1, "stop last player");
+			h.assertTrue(shared.isStopped(), "last player stopped: the instance ends");
+			h.assertFalse(b.hasEffect(MobEffects.GLOWING), "b reverted");
+			h.assertTrue(shared.bossBarPlayers().isEmpty(), "bar removed");
+
+			settings(h).setScope(Scope.PLAYER);
+			ActiveEvent own = TestSupport.start(h, "test_marker", a);
+			ActiveEvent other = TestSupport.start(h, "test_marker", b);
+			h.assertValueEqual(run(h, op(h), "chaosaholic stop " + a.getGameProfile().name()), 1, "player scope stop");
+			h.assertTrue(own.isStopped(), "player scope: stopped");
+			h.assertFalse(a.hasEffect(MobEffects.GLOWING), "a reverted (player scope)");
+			h.assertFalse(other.isStopped(), "b's own instance untouched");
+			h.assertTrue(b.hasEffect(MobEffects.GLOWING), "b keeps its own effect");
+		} finally {
+			defaults(h);
+			cleanup(h, a, b);
 		}
 		h.succeed();
 	}

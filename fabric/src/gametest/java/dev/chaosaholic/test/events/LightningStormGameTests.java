@@ -19,21 +19,26 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * lightning_storm: nothing during the warning, then visual-only strikes ≥ 4 blocks from the player, no fire, capped.
- * Multi-tick tests allow 3 attempts: {@code /chaosaholic off} in ChaosModeGameTests stops every running event in
- * the parallel batch.
+ * The event's strikes mostly land outside the 8x8 test structure, where entities may not tick (only the structure's
+ * chunks are force-loaded), so "no fire" is checked on a bolt of the instance struck inside the structure.
  */
 public class LightningStormGameTests {
-	@GameTest(maxTicks = 200, maxAttempts = 3)
+	@GameTest(maxTicks = 200)
 	public void strikesAfterWarningAwayFromPlayerWithoutFire(GameTestHelper h) {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);
 		ActiveEvent ev = start(h, "lightning_storm", p);
 		int delay = Warning.delay(ev.context());
 		h.assertValueEqual(LightningStorm.planned(ev), 0, "nothing planned at start");
+		// a stone block inside the structure, 6.4 blocks from the player: a real bolt would set fire on top of it
+		BlockPos stone = new BlockPos(6, 0, 6);
+		h.setBlock(stone, Blocks.STONE);
+		Vec3 inside = Vec3.atBottomCenterOf(h.absolutePos(stone.above()));
 		h.startSequence()
 				.thenWaitUntil(() -> h.assertFalse(LightningStorm.strikes(ev).isEmpty(), "a bolt struck"))
 				.thenExecute(() -> {
@@ -42,6 +47,7 @@ public class LightningStormGameTests {
 						double dist = Math.sqrt(sq(s.x - p.getX()) + sq(s.z - p.getZ()));
 						h.assertTrue(dist >= LightningStorm.MIN_DISTANCE, "never on the player: " + dist);
 					}
+					h.assertTrue(LightningStorm.strike(ev, inside) != null, "bolt struck inside the structure");
 				})
 				.thenIdle(5)
 				.thenExecute(() -> {
@@ -52,12 +58,13 @@ public class LightningStormGameTests {
 					}
 					manager(h).stop(ev, StopReason.FORCED);
 					h.assertValueEqual(ev.entities().count(), 0, "no bolt left");
+					h.setBlock(stone, Blocks.AIR);
 					cleanup(h, p);
 				})
 				.thenSucceed();
 	}
 
-	@GameTest(maxTicks = 40, maxAttempts = 3)
+	@GameTest(maxTicks = 40)
 	public void cappedAndStopRemovesBolts(GameTestHelper h) {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);

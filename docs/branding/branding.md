@@ -7,7 +7,7 @@ Alt: *Every level is a coin flip. Sometimes the coin explodes.*
 
 > **Chaosaholic** turns every level-up into a dice roll. Each time you gain an experience level, a **random chaos
 > event** kicks off: sometimes **good** (Midas Hour, Double XP, Moon Jump), sometimes **bad** (TNT Rain, Anvil Rain,
-> Bee Swarm) and sometimes just **weird** (Chickenpocalypse, Sheep Disco, Gravity Flip). A boss bar counts down every
+> Bee Swarm) and sometimes just **weird** (Chicken Apocalypse, Sheep Disco, Gravity Flip). A boss bar counts down every
 > active event, a title or an actionbar line and a sound tell you what just hit you, and dangerous events always give
 > you a 3-second warning. Only new levels count: spending levels and earning them back rolls nothing. The mode is a
 > toggle on the world-creation screen, saved with the world, and operators can flip it any time with
@@ -178,7 +178,7 @@ Keys: `chaosaholic.event.<id>` (name, ≤ 20 characters because it sits in the b
 | `feather_fall` | Good | Feather Fall | Пёрышко | You take no fall damage. |
 | `loot_pinata` | Good | Loot Piñata | Пиньята | Mobs you kill drop extra random loot. |
 | `speed_demon` | Good | Speed Demon | Демон скорости | Speed III and Haste II. |
-| `chest_from_sky` | Good | Sky Chest | Сундук с неба | A chest full of random loot lands nearby. It's yours to keep. |
+| `chest_from_sky` | Good | Chest from the Sky | Сундук с неба | A chest full of random loot lands nearby. It's yours to keep. |
 | `double_xp` | Good | Double XP | Двойной опыт | Experience orbs you pick up count double. |
 | `healing_aura` | Good | Healing Aura | Аура исцеления | Regeneration II. |
 | `iron_skin` | Good | Iron Skin | Железная кожа | Resistance II. |
@@ -194,10 +194,10 @@ Keys: `chaosaholic.event.<id>` (name, ≤ 20 characters because it sits in the b
 | `bee_swarm` | Bad | Bee Swarm | Пчелиный рой | A few angry bees come after you. |
 | `blackout` | Bad | Blackout | Затмение | Darkness closes in for a few seconds. |
 | `gravity_flip` | Weird | Gravity Flip | Кувырок гравитации | You float up and drift down by turns. It always ends softly. |
-| `chicken_apocalypse` | Weird | Chickenpocalypse | Курапокалипсис | Nearby mobs turn into chickens until the event ends. |
+| `chicken_apocalypse` | Weird | Chicken Apocalypse | Куриный апокалипсис | Nearby mobs turn into chickens until the event ends. |
 | `tiny_world` | Weird | Tiny World | Мини-мир | You and everything nearby shrink to half size. |
 | `bouncy_floor` | Weird | Bouncy Floor | Пол-батут | Landing bounces you like slime, with no fall damage. |
-| `upside_down` | Weird | Upside Down | Вверх ногами | Nearby mobs flip upside down. |
+| `upside_down` | Weird | Upside Down Names | Имена вверх ногами | Nearby mobs flip upside down. |
 | `swap` | Weird | Swap | Рокировка | You swap places with a random nearby mob. |
 | `sheep_disco` | Weird | Sheep Disco | Овечье диско | Rainbow sheep show up and start a party. |
 | `slippery` | Weird | Slippery | Гололёд | Every block feels like ice. |

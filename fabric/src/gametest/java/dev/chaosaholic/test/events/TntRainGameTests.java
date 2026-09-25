@@ -38,12 +38,11 @@ import net.minecraft.world.phys.Vec3;
  * tnt_rain: nothing during the warning, then owned lit TNT 4-10 blocks around the player (capped), removed when the
  * event ends (stop, logout); the event's own detonation replaces vanilla's and breaks blocks only with mobGriefing.
  * TNT is never allowed to explode near the parallel test structures: tests stop the event well before the fuse ends,
- * and detonation tests run high above the structure.
- * Multi-tick tests allow 3 attempts: {@code /chaosaholic off} in ChaosModeGameTests stops every running event in
- * the parallel batch.
+ * and detonation tests run high above the structure (inside its force-loaded chunks: the rain's own TNT mostly lands
+ * outside, where entities may not tick, so only its spawning and removal are checked).
  */
 public class TntRainGameTests {
-	@GameTest(maxTicks = 200, maxAttempts = 3)
+	@GameTest(maxTicks = 200)
 	public void warningThenTntAroundPlayerThenStopRemovesIt(GameTestHelper h) {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);
@@ -70,7 +69,7 @@ public class TntRainGameTests {
 				.thenSucceed();
 	}
 
-	@GameTest(maxTicks = 100, maxAttempts = 3)
+	@GameTest(maxTicks = 100)
 	public void cappedAndRemovedOnLogout(GameTestHelper h) {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);
@@ -93,7 +92,7 @@ public class TntRainGameTests {
 	}
 
 	/** onTick replaces the vanilla explosion one tick early (fuse 1): counted as the event's own detonation. */
-	@GameTest(maxTicks = 40, maxAttempts = 3)
+	@GameTest(maxTicks = 40)
 	public void eventDetonatesInsteadOfVanilla(GameTestHelper h) {
 		defaults(h);
 		ServerPlayer p = survivalPlayer(h);

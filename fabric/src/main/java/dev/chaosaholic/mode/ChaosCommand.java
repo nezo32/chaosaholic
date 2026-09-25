@@ -39,7 +39,8 @@ import org.jspecify.annotations.Nullable;
  * /chaosaholic event &lt;id&gt; weight [0..1000]
  * /chaosaholic trigger &lt;id&gt; [targets]   forced start: ignores the mode switch, the event's switch and weight
  * /chaosaholic roll [targets]           random roll like a level-up (weights, switches), ignores the mode switch
- * /chaosaholic stop [targets]           ends every event affecting the targets
+ * /chaosaholic stop [targets]           ends every event affecting the targets (a world-scope event shared with
+ *                                       other players only lets the targets go and goes on for the others)
  * </pre>
  * Results: on/off/status 1 = ON, 0 = OFF; trigger/roll/stop = number of players / events affected.
  */
